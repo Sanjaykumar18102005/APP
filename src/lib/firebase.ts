@@ -4,28 +4,52 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
 // Use environment variables if available (for Netlify/Vercel/etc), otherwise use the JSON file
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigJson.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfigJson.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigJson.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfigJson.appId,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId,
+const getSafeVal = (envVal: string | undefined, jsonVal: string | undefined) => {
+  if (envVal && envVal.length > 0 && !envVal.startsWith('YOUR_')) return envVal;
+  if (jsonVal && jsonVal.length > 0 && !jsonVal.startsWith('YOUR_')) return jsonVal;
+  return undefined;
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const firebaseConfig = {
+  apiKey: getSafeVal(import.meta.env.VITE_FIREBASE_API_KEY, firebaseConfigJson.apiKey),
+  authDomain: getSafeVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, firebaseConfigJson.authDomain),
+  projectId: getSafeVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, firebaseConfigJson.projectId),
+  storageBucket: getSafeVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, firebaseConfigJson.storageBucket),
+  messagingSenderId: getSafeVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, firebaseConfigJson.messagingSenderId),
+  appId: getSafeVal(import.meta.env.VITE_FIREBASE_APP_ID, firebaseConfigJson.appId),
+  firestoreDatabaseId: getSafeVal(import.meta.env.VITE_FIREBASE_DATABASE_ID, firebaseConfigJson.firestoreDatabaseId),
+};
+
+if (!firebaseConfig.apiKey) {
+  console.warn("Firebase API key is missing. Authentication features will not work.");
+}
+
+export const isFirebaseConfigured = !!firebaseConfig.apiKey;
+
+const app = initializeApp(firebaseConfig as any);
+export const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
   try {
+    if (!firebaseConfig.apiKey) {
+      throw new Error("Firebase is not configured correctly. Please check your environment variables.");
+    }
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error signing in with Google", error);
+    if (error.code === 'auth/unauthorized-domain') {
+       alert(`Domain not authorized: "${window.location.hostname}". \n\nPlease add this domain to "Authorized domains" in your Firebase Console (Authentication > Settings).`);
+    } else if (error.code === 'auth/operation-not-allowed') {
+       alert("Google Sign-in is not enabled. Please enable it in Firebase Console (Authentication > Sign-in method).");
+    } else {
+       alert(`Login failed: ${error.message}`);
+    }
     throw error;
   }
 };

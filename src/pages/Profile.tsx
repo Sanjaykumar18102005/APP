@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { User, LogIn, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
-import { auth, signInWithGoogle, signOut, db } from '../lib/firebase';
+import { auth, signInWithGoogle, signOut, db, isFirebaseConfigured } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -260,9 +260,18 @@ export function Profile() {
           <h2 className="text-3xl font-display font-bold mb-2">Welcome to PromptGlow</h2>
           <p className="text-text-soft mb-8">Sign in to save your prompts, sync your history, and access premium AI features.</p>
           
+          {!isFirebaseConfigured && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm text-left">
+              <strong>Configuration Warning:</strong> Firebase API key is missing. 
+              <br/><br/>
+              If you are hosting on Netlify, ensure you have added <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables to your Environment Variables.
+            </div>
+          )}
+
           <button 
             onClick={handleLogin}
-            className="bg-white text-black font-semibold rounded-xl px-8 py-3 w-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+            disabled={!isFirebaseConfigured}
+            className="bg-white text-black font-semibold rounded-xl px-8 py-3 w-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" />
             Continue with Google
