@@ -1,0 +1,6 @@
+{
+  "name": "PromptGlow",
+  "description": "Prompt Builder and Analyzer",
+  "requestFramePermissions": ["microphone", "camera", "geolocation"],
+  "majorCapabilities": []
+}

@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Sora:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-nebula: var(--bg-nebula);
+  --color-bg-surface: var(--bg-surface);
+  --color-primary-accent: var(--primary-accent);
+  --color-secondary-accent: var(--secondary-accent);
+  --color-text-soft: var(--text-soft);
+  --color-glass-border: var(--glass-border);
+  --color-glass-surface: var(--glass-surface);
+  --color-glow: var(--glow);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", sans-serif;
+}
+
+:root {
+  --bg-nebula: #050510;
+  --bg-surface: #12121f;
+  --primary-accent: #FF007A;
+  --secondary-accent: #8B5CF6;
+  --text-soft: #C4B5FD;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-surface: rgba(18, 18, 31, 0.6);
+  --glow: rgba(139, 92, 246, 0.4);
+  --text-main: #FFFFFF;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --hover-bg: rgba(255, 255, 255, 0.1);
+}
+
+:root.light {
+  --bg-nebula: #f5f5fa;
+  --bg-surface: #ffffff;
+  --primary-accent: #FF007A;
+  --secondary-accent: #8B5CF6;
+  --text-soft: #6b7280;
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-surface: rgba(255, 255, 255, 0.8);
+  --glow: rgba(139, 92, 246, 0.2);
+  --text-main: #000000;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  --hover-bg: rgba(0, 0, 0, 0.05);
+}
+
+body {
+    background-color: var(--color-bg-nebula);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+}
+
+.glass-panel {
+  background: var(--color-glass-surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 1.5rem;
+}
+
+.glass-panel:hover {
+  border-color: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 8px 32px 0 var(--color-glow);
+}
+
+.neon-text {
+  text-shadow: 0 0 10px rgba(255, 0, 122, 0.5), 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

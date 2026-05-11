@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // users/{userId} Validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             data.email is string && data.email.size() <= 256 &&
+             data.createdAt == request.time &&
+             (data.get('displayName', '') is string) &&
+             (data.get('avatarUrl', '') is string);
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(userId) &&
+                       isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && isValidId(userId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatarUrl']) &&
+                       (incoming().get('displayName', '') is string) &&
+                       (incoming().get('avatarUrl', '') is string);
+    }
+
+    // prompts/{promptId} Validation
+    function isValidPrompt(data) {
+      return data.keys().hasAll(['userId', 'title', 'content', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 100 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.createdAt == request.time &&
+             (data.get('category', '') is string) &&
+             (!('updatedAt' in data) || data.updatedAt == request.time);
+    }
+
+    match /prompts/{promptId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid && isValidId(promptId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(promptId) && isValidPrompt(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidId(promptId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'category', 'updatedAt']) &&
+                       (incoming().get('title', '') is string && incoming().get('title', '').size() <= 100) &&
+                       (incoming().get('content', '') is string && incoming().get('content', '').size() <= 10000) &&
+                       (incoming().get('category', '') is string);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid && isValidId(promptId);
+    }
+  }
+}
