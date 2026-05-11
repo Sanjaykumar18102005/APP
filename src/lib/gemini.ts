@@ -4,9 +4,9 @@ let aiClient: GoogleGenAI | null = null;
 
 export function getGemini(): GoogleGenAI {
   if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY;
+    const key = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (!key) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+      throw new Error('VITE_GEMINI_API_KEY or GEMINI_API_KEY environment variable is required');
     }
     aiClient = new GoogleGenAI({ apiKey: key });
   }
