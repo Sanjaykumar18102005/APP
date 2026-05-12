@@ -61,7 +61,7 @@ Please generate ONE multiple-choice question to further clarify their intent, fo
 Provide 3-5 distinct options for the question.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -102,7 +102,7 @@ The output Must strictly only be the generated Prompt Text itself.
 Use roles, task descriptions, contexts, constraints, and format requirements as needed to make it world class.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
       });
 

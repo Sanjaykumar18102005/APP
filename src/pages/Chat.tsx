@@ -42,7 +42,7 @@ export function Chat() {
       // For simplicity in React without persisting the chat instance in refs perfectly, I'll use the stateless approach by constructing the history if needed, but `ai.chats.create` is best.
       
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
         config: {
           systemInstruction: "You are a helpful, expert AI assistant within an app called PromptGlow."
@@ -58,7 +58,7 @@ export function Chat() {
       if (err.message?.includes('API_KEY_INVALID')) {
         errorMessage = "API Key Error: Your Gemini API key is invalid or not correctly configured on Netlify.";
       } else if (err.message?.includes('model not found') || err.message?.includes('permission_denied')) {
-        errorMessage = `Model Error: The model "gemini-3-flash-preview" might not be available for your API key.`;
+        errorMessage = `Model Error: The model "gemini-2.0-flash" might not be available for your API key.`;
       } else if (err.message?.includes('VITE_GEMINI_API_KEY environment variable is missing')) {
         errorMessage = "Configuration Error: VITE_GEMINI_API_KEY is missing from Netlify settings.";
       } else if (err.message) {
