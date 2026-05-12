@@ -61,7 +61,7 @@ Please generate ONE multiple-choice question to further clarify their intent, fo
 Provide 3-5 distinct options for the question.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -80,9 +80,9 @@ Provide 3-5 distinct options for the question.`;
       setCurrentQuestion(data);
       setPhase(Phase.QUESTION);
       
-    } catch (err) {
-      console.error(err);
-      // Fallback
+    } catch (err: any) {
+      console.error("Next Question Error:", err);
+      alert(`AI Error: ${err.message || 'Failed to generate question.'}`);
       setPhase(Phase.INIT);
     }
   };
@@ -102,14 +102,15 @@ The output Must strictly only be the generated Prompt Text itself.
 Use roles, task descriptions, contexts, constraints, and format requirements as needed to make it world class.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-3-flash-preview",
         contents: prompt,
       });
 
       setFinalPrompt(response.text || "Failed to generate prompt.");
       setPhase(Phase.RESULT);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Final Prompt Error:", err);
+      alert(`AI Error: ${err.message || 'Failed to generate prompt.'}`);
       setPhase(Phase.INIT);
     }
   };

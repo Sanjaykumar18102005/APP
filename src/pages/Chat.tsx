@@ -41,28 +41,30 @@ export function Chat() {
       // To implement a true chat, we initialize a chat session if it's the first real call, or just maintain it in memory, but `@google/genai` specifies we can use `ai.chats.create`
       // For simplicity in React without persisting the chat instance in refs perfectly, I'll use the stateless approach by constructing the history if needed, but `ai.chats.create` is best.
       
-      const chat = ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: userMessage, // For simple Q&A as per HandleSend
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
         config: {
           systemInstruction: "You are a helpful, expert AI assistant within an app called PromptGlow."
         }
       });
       
-      const response = await chat;
-      
       setMessages(prev => [...prev, { role: 'model', content: response.text || "Error: No response text" }]);
       
     } catch (err: any) {
-      console.error(err);
+      console.error("Chat Error:", err);
       let errorMessage = "Sorry, there was an error processing your request.";
+      
       if (err.message?.includes('API_KEY_INVALID')) {
         errorMessage = "API Key Error: Your Gemini API key is invalid or not correctly configured on Netlify.";
       } else if (err.message?.includes('model not found') || err.message?.includes('permission_denied')) {
-        errorMessage = `Model Error: The model "gemini-flash-latest" might not be available for your API key.`;
+        errorMessage = `Model Error: The model "gemini-3-flash-preview" might not be available for your API key.`;
       } else if (err.message?.includes('VITE_GEMINI_API_KEY environment variable is missing')) {
         errorMessage = "Configuration Error: VITE_GEMINI_API_KEY is missing from Netlify settings.";
+      } else if (err.message) {
+        errorMessage = `AI Error: ${err.message}`;
       }
+      
       setMessages(prev => [...prev, { role: 'model', content: errorMessage }]);
     } finally {
       setIsTyping(false);

@@ -43,7 +43,7 @@ export function Vision() {
         try {
           const ai = getGemini();
           const response = await ai.models.generateContent({
-            model: "gemini-flash-latest", // Vision supported via alias
+            model: "gemini-3-flash-preview",
             contents: {
               parts: [
                 {
@@ -60,9 +60,9 @@ export function Vision() {
           });
           
           setResult(response.text || "Could not analyze the image.");
-        } catch (err) {
-          console.error(err);
-          setResult("Error contacting AI server.");
+        } catch (err: any) {
+          console.error("Vision Error:", err);
+          setResult(`Error contacting AI server: ${err.message || 'Unknown Error'}`);
         } finally {
           setIsAnalyzing(false);
         }
