@@ -139,7 +139,7 @@ Use roles, task descriptions, contexts, constraints, and format requirements as 
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser || saved) return;
+    if (!auth?.currentUser || saved) return;
     try {
       await addDoc(collection(db, "prompts"), {
         userId: auth.currentUser.uid,
@@ -313,7 +313,7 @@ Use roles, task descriptions, contexts, constraints, and format requirements as 
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                {auth.currentUser && (
+                {auth?.currentUser && (
                   <button 
                     onClick={handleSave}
                     disabled={saved}

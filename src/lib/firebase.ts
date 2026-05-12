@@ -20,23 +20,36 @@ const firebaseConfig = {
   firestoreDatabaseId: getSafeVal(import.meta.env.VITE_FIREBASE_DATABASE_ID, firebaseConfigJson.firestoreDatabaseId),
 };
 
-if (!firebaseConfig.apiKey) {
-  console.warn("Firebase API key is missing. Authentication features will not work.");
+export const isFirebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && !firebaseConfig.apiKey.startsWith('YOUR_'));
+
+if (!isFirebaseConfigured) {
+  console.warn("Firebase is not correctly configured. Authentication and database features will be disabled.");
 }
 
-export const isFirebaseConfigured = !!firebaseConfig.apiKey;
+// Only initialize if we have at least an API key and Project ID to avoid immediate crashes
+let app: any = null;
+let db: any = null;
+let auth: any = null;
 
-const app = initializeApp(firebaseConfig as any);
-export const db = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-export const auth = getAuth(app);
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig as any);
+    db = firebaseConfig.firestoreDatabaseId 
+      ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+      : getFirestore(app);
+    auth = getAuth(app);
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+  }
+}
+
+export { app, db, auth };
 
 export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
   try {
-    if (!firebaseConfig.apiKey) {
+    if (!auth) {
       throw new Error("Firebase is not configured correctly. Please check your environment variables.");
     }
     const result = await signInWithPopup(auth, googleProvider);
@@ -56,7 +69,9 @@ export const signInWithGoogle = async () => {
 
 export const signOut = async () => {
   try {
-    await firebaseSignOut(auth);
+    if (auth) {
+      await firebaseSignOut(auth);
+    }
   } catch (error) {
     console.error("Error signing out", error);
     throw error;
@@ -64,6 +79,7 @@ export const signOut = async () => {
 };
 
 export async function testConnection() {
+  if (!db) return;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
@@ -72,4 +88,6 @@ export async function testConnection() {
     }
   }
 }
-testConnection();
+if (isFirebaseConfigured) {
+  testConnection();
+}

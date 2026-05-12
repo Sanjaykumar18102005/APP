@@ -16,6 +16,7 @@ export function Profile() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) return;
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (u && view === 'saved') {
@@ -38,6 +39,7 @@ export function Profile() {
   }, [theme]);
 
   const fetchPrompts = async (uid: string) => {
+    if (!isFirebaseConfigured || !db) return;
     setLoading(true);
     try {
       const q = query(collection(db, "prompts"), where("userId", "==", uid));
@@ -260,17 +262,27 @@ export function Profile() {
           <h2 className="text-3xl font-display font-bold mb-2">Welcome to PromptGlow</h2>
           <p className="text-text-soft mb-8">Sign in to save your prompts, sync your history, and access premium AI features.</p>
           
-          {!isFirebaseConfigured && (
+          {!isFirebaseConfigured ? (
             <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm text-left">
-              <strong>Configuration Warning:</strong> Firebase API key is missing. 
-              <br/><br/>
-              If you are hosting on Netlify, ensure you have added <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables to your Environment Variables.
+              <div className="flex items-center gap-2 mb-2 font-bold">
+                <Settings className="w-4 h-4" /> 
+                Configuration Missing
+              </div>
+              Firebase is not configured. To fix this on Netlify, add <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables (from your firebase-applet-config.json) to your Environment Variables dashboard.
+            </div>
+          ) : !auth && (
+            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm text-left">
+              <div className="flex items-center gap-2 mb-2 font-bold">
+                <Settings className="w-4 h-4" /> 
+                Initialization Error
+              </div>
+              Firebase failed to initialize. Check the browser console for details. This usually means the API key or project ID is invalid.
             </div>
           )}
 
           <button 
             onClick={handleLogin}
-            disabled={!isFirebaseConfigured}
+            disabled={!isFirebaseConfigured || !auth}
             className="bg-white text-black font-semibold rounded-xl px-8 py-3 w-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" />
