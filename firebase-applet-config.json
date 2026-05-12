@@ -3,7 +3,7 @@
   "appId": "YOUR_APP_ID",
   "apiKey": "YOUR_API_KEY",
   "authDomain": "YOUR_AUTH_DOMAIN",
-  "firestoreDatabaseId": "ai-studio-b46574ec-59f5-44ab-860c-dc2f630fcac5",
+  "firestoreDatabaseId": "YOUR_DATABASE_ID",
   "storageBucket": "YOUR_STORAGE_BUCKET",
   "messagingSenderId": "YOUR_SENDER_ID",
   "measurementId": ""
