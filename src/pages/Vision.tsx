@@ -43,7 +43,7 @@ export function Vision() {
         try {
           const ai = getGemini();
           const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview", // Vision inherently supported via contents parts
+            model: "gemini-flash-latest", // Vision supported via alias
             contents: {
               parts: [
                 {

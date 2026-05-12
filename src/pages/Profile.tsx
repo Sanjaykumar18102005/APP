@@ -268,7 +268,9 @@ export function Profile() {
                 <Settings className="w-4 h-4" /> 
                 Configuration Missing
               </div>
-              Firebase is not configured. To fix this on Netlify, add <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables (from your firebase-applet-config.json) to your Environment Variables dashboard.
+              Firebase is not configured. To fix this on Netlify, add <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables to your Environment Variables dashboard. 
+              <br/><br/>
+              Also ensure you have added <code>VITE_GEMINI_API_KEY</code> for the AI features to work.
             </div>
           ) : !auth && (
             <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm text-left">

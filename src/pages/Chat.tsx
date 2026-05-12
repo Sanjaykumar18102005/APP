@@ -41,30 +41,29 @@ export function Chat() {
       // To implement a true chat, we initialize a chat session if it's the first real call, or just maintain it in memory, but `@google/genai` specifies we can use `ai.chats.create`
       // For simplicity in React without persisting the chat instance in refs perfectly, I'll use the stateless approach by constructing the history if needed, but `ai.chats.create` is best.
       
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
+      const chat = ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: userMessage, // For simple Q&A as per HandleSend
         config: {
           systemInstruction: "You are a helpful, expert AI assistant within an app called PromptGlow."
         }
       });
       
-      // Need to seed history if we have any. Wait, the docs say we can initialize with `history`.
-      // Let's just do a normal sendMessage for now since we drop the instance on re-render.
-      // A better way: `generateContent` passing all history arrays.
+      const response = await chat;
       
-      const contents: any[] = messages.filter(m => m.role === 'user').map(m => m.content);
-      contents.push(userMessage);
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: userMessage, // We could pass array of dicts for history but keeping it simple for the layout
-      });
+      setMessages(prev => [...prev, { role: 'model', content: response.text || "Error: No response text" }]);
       
-      setMessages(prev => [...prev, { role: 'model', content: response.text || "Error" }]);
-      
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'model', content: "Sorry, there was an error processing your request." }]);
+      let errorMessage = "Sorry, there was an error processing your request.";
+      if (err.message?.includes('API_KEY_INVALID')) {
+        errorMessage = "API Key Error: Your Gemini API key is invalid or not correctly configured on Netlify.";
+      } else if (err.message?.includes('model not found') || err.message?.includes('permission_denied')) {
+        errorMessage = `Model Error: The model "gemini-flash-latest" might not be available for your API key.`;
+      } else if (err.message?.includes('VITE_GEMINI_API_KEY environment variable is missing')) {
+        errorMessage = "Configuration Error: VITE_GEMINI_API_KEY is missing from Netlify settings.";
+      }
+      setMessages(prev => [...prev, { role: 'model', content: errorMessage }]);
     } finally {
       setIsTyping(false);
     }
