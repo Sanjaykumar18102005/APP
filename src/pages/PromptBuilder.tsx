@@ -2,11 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Brain, ArrowRight, Sparkles, Copy, CheckCircle2, ChevronRight, Save, ExternalLink } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { getGemini } from '../lib/gemini';
-import { Type } from '@google/genai';
-import { db, auth } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/utils';
+import { useAuth } from '../lib/auth-context';
 
 type Question = {
   question: string;
@@ -22,6 +21,7 @@ enum Phase {
 }
 
 export function PromptBuilder() {
+  const { user } = useAuth();
   const location = useLocation();
   const [phase, setPhase] = useState<Phase>(Phase.INIT);
   const [initialIdea, setInitialIdea] = useState(location.state?.idea || "");
@@ -47,36 +47,21 @@ export function PromptBuilder() {
   const requestNextQuestion = async (currentAnswers: {q: string, a: string}[]) => {
     setPhase(Phase.ANALYZING);
     try {
-      const ai = getGemini();
-      
-      const historyStr = currentAnswers.map(ans => `Q: ${ans.q}\nA: ${ans.a}`).join('\n\n');
-      
-      const prompt = `You are an expert Prompt Engineer AI Copilot. 
-The user wants to write a highly optimized prompt starting from this vague idea: "${initialIdea}"
-
-They have already provided these clarifications:
-${historyStr}
-
-Please generate ONE multiple-choice question to further clarify their intent, format, constraints, or tone. The goal is to build the ultimate prompt.
-Provide 3-5 distinct options for the question.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              question: { type: Type.STRING },
-              options: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["question", "options"]
-          }
-        }
+      const response = await fetch('/api/prompt-builder/question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initialIdea,
+          answers: currentAnswers
+        })
       });
 
-      const data = JSON.parse(response.text || "{}");
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned status ${response.status}`);
+      }
+
+      const data = await response.json();
       setCurrentQuestion(data);
       setPhase(Phase.QUESTION);
       
@@ -90,23 +75,22 @@ Provide 3-5 distinct options for the question.`;
   const generateFinalPrompt = async (currentAnswers: {q: string, a: string}[]) => {
     setPhase(Phase.GENERATING);
     try {
-      const ai = getGemini();
-      const historyStr = currentAnswers.map(ans => `Q: ${ans.q}\nA: ${ans.a}`).join('\n\n');
-      
-      const prompt = `You are a world-class prompt engineer. Write an extremely high quality, detailed prompt based on this initial idea and clarification context:
-Initial idea: "${initialIdea}"
-Context:
-${historyStr}
-
-The output Must strictly only be the generated Prompt Text itself.
-Use roles, task descriptions, contexts, constraints, and format requirements as needed to make it world class.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: prompt,
+      const response = await fetch('/api/prompt-builder/final-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initialIdea,
+          answers: currentAnswers
+        })
       });
 
-      setFinalPrompt(response.text || "Failed to generate prompt.");
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setFinalPrompt(data.text || "Failed to generate prompt.");
       setPhase(Phase.RESULT);
     } catch (err: any) {
       console.error("Final Prompt Error:", err);
@@ -140,10 +124,27 @@ Use roles, task descriptions, contexts, constraints, and format requirements as 
   };
 
   const handleSave = async () => {
-    if (!auth?.currentUser || saved) return;
+    if (!user || saved) return;
     try {
+      if (user.isSandbox) {
+        const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
+        const newPrompt = {
+          id: Math.random().toString(36).substring(2, 9),
+          userId: user.uid,
+          title: initialIdea.substring(0, 90) || "Untitled Prompt",
+          content: finalPrompt.substring(0, 9900),
+          category: "Generated",
+          createdAt: { seconds: Math.floor(Date.now() / 1000) }
+        };
+        sandboxPrompts.unshift(newPrompt);
+        localStorage.setItem('sandbox_saved_prompts', JSON.stringify(sandboxPrompts));
+        setSaved(true);
+        return;
+      }
+
+      if (!db) return;
       await addDoc(collection(db, "prompts"), {
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         title: initialIdea.substring(0, 90) || "Untitled Prompt",
         content: finalPrompt.substring(0, 9900),
         category: "Generated",
@@ -314,7 +315,7 @@ Use roles, task descriptions, contexts, constraints, and format requirements as 
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                {auth?.currentUser && (
+                {user && (
                   <button 
                     onClick={handleSave}
                     disabled={saved}

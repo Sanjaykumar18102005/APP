@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { User, LogIn, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
-import { auth, signInWithGoogle, signOut, db, isFirebaseConfigured } from '../lib/firebase';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { User, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
+import { useAuth } from '../lib/auth-context';
+import { isFirebaseConfigured, db } from '../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
 
 export function Profile() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
   const [view, setView] = useState<ViewMode>('main');
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
@@ -16,15 +16,10 @@ export function Profile() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) return;
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u && view === 'saved') {
-        fetchPrompts(u.uid);
-      }
-    });
-    return () => unsubscribe();
-  }, [view]);
+    if (user && view === 'saved') {
+      fetchPrompts(user.uid);
+    }
+  }, [view, user]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -39,8 +34,19 @@ export function Profile() {
   }, [theme]);
 
   const fetchPrompts = async (uid: string) => {
-    if (!isFirebaseConfigured || !db) return;
     setLoading(true);
+    if (user?.isSandbox) {
+      const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
+      setPrompts(sandboxPrompts);
+      setLoading(false);
+      return;
+    }
+
+    if (!isFirebaseConfigured || !db) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const q = query(collection(db, "prompts"), where("userId", "==", uid));
       const querySnapshot = await getDocs(q);
@@ -62,7 +68,7 @@ export function Profile() {
 
   const handleLogin = async () => {
     try {
-      await signInWithGoogle();
+      await loginWithGoogle();
     } catch (e) {
       console.error(e);
     }
@@ -70,7 +76,7 @@ export function Profile() {
 
   const handleSignOut = async () => {
      try {
-       await signOut();
+       await logout();
        setView('main');
      } catch (e) {
        console.error(e);
@@ -262,33 +268,19 @@ export function Profile() {
           <h2 className="text-3xl font-display font-bold mb-2">Welcome to PromptGlow</h2>
           <p className="text-text-soft mb-8">Sign in to save your prompts, sync your history, and access premium AI features.</p>
           
-          {!isFirebaseConfigured ? (
-            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm text-left">
-              <div className="flex items-center gap-2 mb-2 font-bold">
-                <Settings className="w-4 h-4" /> 
-                Configuration Missing
-              </div>
-              Firebase is not configured. To fix this on Netlify, add <code>VITE_FIREBASE_API_KEY</code> and other Firebase variables to your Environment Variables dashboard. 
-              <br/><br/>
-              Also ensure you have added <code>VITE_GEMINI_API_KEY</code> for the AI features to work.
-            </div>
-          ) : !auth && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm text-left">
-              <div className="flex items-center gap-2 mb-2 font-bold">
-                <Settings className="w-4 h-4" /> 
-                Initialization Error
-              </div>
-              Firebase failed to initialize. Check the browser console for details. This usually means the API key or project ID is invalid.
-            </div>
-          )}
-
           <button 
             onClick={handleLogin}
-            disabled={!isFirebaseConfigured || !auth}
-            className="bg-white text-black font-semibold rounded-xl px-8 py-3 w-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-white text-black font-semibold rounded-xl px-8 py-3 w-full hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 mb-3 cursor-pointer"
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" />
             Continue with Google
+          </button>
+          
+          <button 
+            onClick={loginAsGuest}
+            className="bg-[var(--hover-bg)] text-[var(--text-main)] border border-glass-border font-semibold rounded-xl px-8 py-3 w-full hover:bg-[var(--hover-bg)]/80 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            Sign in as Sandbox Guest
           </button>
         </motion.div>
       ) : (

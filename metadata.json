@@ -2,5 +2,5 @@
   "name": "PromptGlow",
   "description": "Prompt Builder and Analyzer",
   "requestFramePermissions": ["microphone", "camera", "geolocation"],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Camera, Image as ImageIcon, UploadCloud, Sparkles, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getGemini } from '../lib/gemini';
 import ReactMarkdown from 'react-markdown';
 
 export function Vision() {
@@ -41,25 +40,22 @@ export function Vision() {
         const base64EncodedString = base64data.split(',')[1];
         
         try {
-          const ai = getGemini();
-          const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: {
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: file.type,
-                    data: base64EncodedString
-                  }
-                },
-                {
-                  text: `Analyze this image in deep technical detail. Provide a breakdown of its visual components, lighting, art style, and camera settings (if it looks like a photo). Then, provide two production-ready prompts that could recreate it: 1) A Midjourney prompt, and 2) A Stable Diffusion prompt. Output in cleanly formatted markdown.`
-                }
-              ]
-            }
+          const response = await fetch('/api/vision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64EncodedString,
+              mimeType: file.type
+            })
           });
-          
-          setResult(response.text || "Could not analyze the image.");
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error || `Server returned status ${response.status}`);
+          }
+
+          const data = await response.json();
+          setResult(data.text || "Could not analyze the image.");
         } catch (err: any) {
           console.error("Vision Error:", err);
           setResult(`Error contacting AI server: ${err.message || 'Unknown Error'}`);

@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Sparkles } from 'lucide-react';
-import { getGemini } from '../lib/gemini';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { Content } from '@google/genai';
 
 type Message = {
   role: 'user' | 'model';
@@ -17,9 +15,6 @@ export function Chat() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  
-  // We need to keep a mutable history array suitable for genai
-  const [chatHistory, setChatHistory] = useState<Content[]>([]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -37,34 +32,28 @@ export function Chat() {
     setIsTyping(true);
 
     try {
-      const ai = getGemini();
-      // To implement a true chat, we initialize a chat session if it's the first real call, or just maintain it in memory, but `@google/genai` specifies we can use `ai.chats.create`
-      // For simplicity in React without persisting the chat instance in refs perfectly, I'll use the stateless approach by constructing the history if needed, but `ai.chats.create` is best.
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-        config: {
-          systemInstruction: "You are a helpful, expert AI assistant within an app called PromptGlow."
-        }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...messages,
+            { role: 'user', content: userMessage }
+          ]
+        })
       });
-      
-      setMessages(prev => [...prev, { role: 'model', content: response.text || "Error: No response text" }]);
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'model', content: data.text || "Error: Empty response" }]);
       
     } catch (err: any) {
       console.error("Chat Error:", err);
-      let errorMessage = "Sorry, there was an error processing your request.";
-      
-      if (err.message?.includes('API_KEY_INVALID')) {
-        errorMessage = "API Key Error: Your Gemini API key is invalid or not correctly configured on Netlify.";
-      } else if (err.message?.includes('model not found') || err.message?.includes('permission_denied')) {
-        errorMessage = `Model Error: The model "gemini-2.0-flash" might not be available for your API key.`;
-      } else if (err.message?.includes('VITE_GEMINI_API_KEY environment variable is missing')) {
-        errorMessage = "Configuration Error: VITE_GEMINI_API_KEY is missing from Netlify settings.";
-      } else if (err.message) {
-        errorMessage = `AI Error: ${err.message}`;
-      }
-      
+      let errorMessage = `AI Error: ${err.message || 'Unknown server error.'}`;
       setMessages(prev => [...prev, { role: 'model', content: errorMessage }]);
     } finally {
       setIsTyping(false);

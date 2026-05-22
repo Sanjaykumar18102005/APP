@@ -5,8 +5,9 @@ import firebaseConfigJson from '../../firebase-applet-config.json';
 
 // Use environment variables if available (for Netlify/Vercel/etc), otherwise use the JSON file
 const getSafeVal = (envVal: string | undefined, jsonVal: string | undefined) => {
-  if (envVal && envVal.length > 0 && !envVal.startsWith('YOUR_')) return envVal;
-  if (jsonVal && jsonVal.length > 0 && !jsonVal.startsWith('YOUR_')) return jsonVal;
+  const isPlaceHolder = (v: string | undefined) => !v || v.startsWith('YOUR_') || v.startsWith('MY_') || v === 'none';
+  if (envVal && !isPlaceHolder(envVal)) return envVal;
+  if (jsonVal && !isPlaceHolder(jsonVal)) return jsonVal;
   return undefined;
 };
 
@@ -20,10 +21,10 @@ const firebaseConfig = {
   firestoreDatabaseId: getSafeVal(import.meta.env.VITE_FIREBASE_DATABASE_ID, firebaseConfigJson.firestoreDatabaseId),
 };
 
-export const isFirebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && !firebaseConfig.apiKey.startsWith('YOUR_'));
+export const isFirebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey.length > 15);
 
 if (!isFirebaseConfigured) {
-  console.warn("Firebase is not correctly configured. Authentication and database features will be disabled.");
+  console.warn("Firebase configuration is missing or incomplete. Some features will be disabled.");
 }
 
 // Only initialize if we have at least an API key and Project ID to avoid immediate crashes
