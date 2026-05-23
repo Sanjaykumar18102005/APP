@@ -2,14 +2,17 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import { healthRouter } from './src/lib/health';
 import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
-
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+const PORT = Number(process.env.PORT) || 3000;
+
+app.use(healthRouter);
 
 // Lazy init of Gemini API client
 let aiClient: GoogleGenAI | null = null;

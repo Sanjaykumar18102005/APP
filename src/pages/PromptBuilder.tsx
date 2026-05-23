@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, ArrowRight, Sparkles, Copy, CheckCircle2, ChevronRight, Save, ExternalLink } from 'lucide-react';
+import { Brain, Sparkles, Copy, CheckCircle2, ChevronRight, Save, ExternalLink, ClipboardCheck } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -31,6 +31,7 @@ export function PromptBuilder() {
   const [finalPrompt, setFinalPrompt] = useState("");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [geminiToast, setGeminiToast] = useState(false);
 
   const stepsToGo = 3 - answers.length; // We want 3 Adaptive Questions minimum
 
@@ -121,6 +122,13 @@ export function PromptBuilder() {
     navigator.clipboard.writeText(finalPrompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenGemini = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    navigator.clipboard.writeText(finalPrompt).then(() => {
+      setGeminiToast(true);
+      setTimeout(() => setGeminiToast(false), 4000);
+    });
   };
 
   const handleSave = async () => {
@@ -306,12 +314,23 @@ export function PromptBuilder() {
                   href="https://gemini.google.com/app" 
                   target="_blank" 
                   rel="noreferrer" 
-                  onClick={(e) => { handleCopy(); }} 
-                  className="glass-panel px-3 py-2 flex items-center gap-1.5 hover:bg-white/10 transition-colors text-sm rounded-xl" 
-                  title="Copies prompt to clipboard and opens Gemini"
+                  onClick={handleOpenGemini} 
+                  className="glass-panel px-3 py-2 flex items-center gap-1.5 hover:bg-white/10 transition-colors text-sm rounded-xl relative" 
+                  title="Copies prompt — paste it (Ctrl+V) in Gemini"
                 >
                    <ExternalLink className="w-3.5 h-3.5 text-text-soft" /> Gemini
                 </a>
+                {geminiToast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-secondary-accent text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 pointer-events-none"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    Prompt copied! Paste it in Gemini (Ctrl+V)
+                  </motion.div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">

@@ -1,24 +1,17 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfigJson from '../../firebase-applet-config.json';
 
-// Use environment variables if available (for Netlify/Vercel/etc), otherwise use the JSON file
-const getSafeVal = (envVal: string | undefined, jsonVal: string | undefined) => {
-  const isPlaceHolder = (v: string | undefined) => !v || v.startsWith('YOUR_') || v.startsWith('MY_') || v === 'none';
-  if (envVal && !isPlaceHolder(envVal)) return envVal;
-  if (jsonVal && !isPlaceHolder(jsonVal)) return jsonVal;
-  return undefined;
-};
+
 
 const firebaseConfig = {
-  apiKey: getSafeVal(import.meta.env.VITE_FIREBASE_API_KEY, firebaseConfigJson.apiKey),
-  authDomain: getSafeVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, firebaseConfigJson.authDomain),
-  projectId: getSafeVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, firebaseConfigJson.projectId),
-  storageBucket: getSafeVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, firebaseConfigJson.storageBucket),
-  messagingSenderId: getSafeVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, firebaseConfigJson.messagingSenderId),
-  appId: getSafeVal(import.meta.env.VITE_FIREBASE_APP_ID, firebaseConfigJson.appId),
-  firestoreDatabaseId: getSafeVal(import.meta.env.VITE_FIREBASE_DATABASE_ID, firebaseConfigJson.firestoreDatabaseId),
+  apiKey: process.env.FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID || import.meta.env.VITE_FIREBASE_APP_ID,
+  firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_DATABASE_ID,
 };
 
 export const isFirebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey.length > 15);
