@@ -7,6 +7,7 @@ const navItems = [
   { icon: Sparkles, label: 'Glow', path: '/builder' },
   { icon: Camera, label: 'Vision', path: '/vision' },
   { icon: Mic, label: 'Voice', path: '/voice' },
+  { icon: MessageSquare, label: 'Chat', path: '/chat' },
   { icon: User, label: 'Profile', path: '/profile' }
 ];
 

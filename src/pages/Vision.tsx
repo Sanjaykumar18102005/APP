@@ -164,12 +164,12 @@ export function Vision() {
                         <ExternalLink className="w-3.5 h-3.5 text-text-soft" /> Claude
                       </a>
                       <a 
-                        href={`https://gemini.google.com/app?q=${encodeURIComponent(result)}`} 
+                        href="https://gemini.google.com/app" 
                         target="_blank" 
                         rel="noreferrer" 
                         onClick={() => { navigator.clipboard.writeText(result); }} 
                         className="glass-panel px-3 py-2 flex items-center gap-1.5 hover:bg-[var(--hover-bg)] transition-colors text-sm rounded-xl" 
-                        title="Copies prompt to clipboard and opens Gemini with prompt pre‑filled"
+                        title="Copies prompt to clipboard and opens Gemini"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-text-soft" /> Gemini
                       </a>

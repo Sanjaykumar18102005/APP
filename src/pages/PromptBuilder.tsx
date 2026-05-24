@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Sparkles, Copy, CheckCircle2, ChevronRight, Save, ExternalLink, ClipboardCheck } from 'lucide-react';
+import { Brain, ArrowRight, Sparkles, Copy, CheckCircle2, ChevronRight, Save, ExternalLink } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -31,7 +31,7 @@ export function PromptBuilder() {
   const [finalPrompt, setFinalPrompt] = useState("");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [geminiToast, setGeminiToast] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const stepsToGo = 3 - answers.length; // We want 3 Adaptive Questions minimum
 
@@ -47,6 +47,7 @@ export function PromptBuilder() {
 
   const requestNextQuestion = async (currentAnswers: {q: string, a: string}[]) => {
     setPhase(Phase.ANALYZING);
+    setError(null);
     try {
       const response = await fetch('/api/prompt-builder/question', {
         method: 'POST',
@@ -68,13 +69,18 @@ export function PromptBuilder() {
       
     } catch (err: any) {
       console.error("Next Question Error:", err);
-      alert(`AI Error: ${err.message || 'Failed to generate question.'}`);
+      let errMsg = err.message || 'Failed to generate question.';
+      if (errMsg.includes('GEMINI_API_KEY')) {
+        errMsg = "Missing Gemini API Key. Please click on Settings (gear icon in the AI Studio side navigation bar or top right), go to Secrets, configure your GEMINI_API_KEY value, and ensure the secret key matches your real API key credentials.";
+      }
+      setError(errMsg);
       setPhase(Phase.INIT);
     }
   };
 
   const generateFinalPrompt = async (currentAnswers: {q: string, a: string}[]) => {
     setPhase(Phase.GENERATING);
+    setError(null);
     try {
       const response = await fetch('/api/prompt-builder/final-prompt', {
         method: 'POST',
@@ -95,7 +101,11 @@ export function PromptBuilder() {
       setPhase(Phase.RESULT);
     } catch (err: any) {
       console.error("Final Prompt Error:", err);
-      alert(`AI Error: ${err.message || 'Failed to generate prompt.'}`);
+      let errMsg = err.message || 'Failed to generate prompt.';
+      if (errMsg.includes('GEMINI_API_KEY')) {
+        errMsg = "Missing Gemini API Key. Please click on Settings (gear icon in the AI Studio side navigation bar or top right), go to Secrets, configure your GEMINI_API_KEY value, and ensure the secret key matches your real API key credentials.";
+      }
+      setError(errMsg);
       setPhase(Phase.INIT);
     }
   };
@@ -103,6 +113,7 @@ export function PromptBuilder() {
   const startRefinement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!initialIdea.trim()) return;
+    setError(null);
     requestNextQuestion([]);
   };
 
@@ -122,13 +133,6 @@ export function PromptBuilder() {
     navigator.clipboard.writeText(finalPrompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleOpenGemini = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    navigator.clipboard.writeText(finalPrompt).then(() => {
-      setGeminiToast(true);
-      setTimeout(() => setGeminiToast(false), 4000);
-    });
   };
 
   const handleSave = async () => {
@@ -183,6 +187,16 @@ export function PromptBuilder() {
               <h1 className="text-3xl md:text-4xl font-display font-bold mb-4 neon-text break-words">PromptGlow Mode</h1>
               <p className="text-text-soft">Enter your raw, unpolished idea. We'll turn it into gold.</p>
             </div>
+
+            {error && (
+              <div className="glass-panel p-5 mb-6 border-red-500/30 bg-red-500/10 text-red-200 text-sm rounded-2xl flex flex-col gap-2 max-w-xl mx-auto">
+                <div className="flex items-center gap-2 text-red-400 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  API Configuration Required
+                </div>
+                <p className="leading-relaxed opacity-90">{error}</p>
+              </div>
+            )}
             
             <form onSubmit={startRefinement} className="relative">
               <div className="glass-panel p-2 flex items-center">
@@ -314,23 +328,12 @@ export function PromptBuilder() {
                   href="https://gemini.google.com/app" 
                   target="_blank" 
                   rel="noreferrer" 
-                  onClick={handleOpenGemini} 
-                  className="glass-panel px-3 py-2 flex items-center gap-1.5 hover:bg-white/10 transition-colors text-sm rounded-xl relative" 
-                  title="Copies prompt — paste it (Ctrl+V) in Gemini"
+                  onClick={(e) => { handleCopy(); }} 
+                  className="glass-panel px-3 py-2 flex items-center gap-1.5 hover:bg-white/10 transition-colors text-sm rounded-xl" 
+                  title="Copies prompt to clipboard and opens Gemini"
                 >
                    <ExternalLink className="w-3.5 h-3.5 text-text-soft" /> Gemini
                 </a>
-                {geminiToast && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-secondary-accent text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 pointer-events-none"
-                  >
-                    <ClipboardCheck className="w-4 h-4" />
-                    Prompt copied! Paste it in Gemini (Ctrl+V)
-                  </motion.div>
-                )}
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
