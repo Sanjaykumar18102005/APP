@@ -3,14 +3,28 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOu
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
+// Helper to get environment variable if configured, otherwise fallback to the JSON configuration
+const getSafeVal = (envVal: string | undefined, jsonVal: string | undefined) => {
+  const isPlaceholder = (v: string | undefined) => 
+    !v || 
+    v.startsWith('YOUR_') || 
+    v.startsWith('MY_') || 
+    v === 'none' || 
+    v === '';
+  
+  if (envVal && !isPlaceholder(envVal)) return envVal;
+  if (jsonVal && !isPlaceholder(jsonVal)) return jsonVal;
+  return undefined;
+};
+
 const firebaseConfig = {
-  apiKey: firebaseConfigJson.apiKey,
-  authDomain: firebaseConfigJson.authDomain,
-  projectId: firebaseConfigJson.projectId,
-  storageBucket: firebaseConfigJson.storageBucket,
-  messagingSenderId: firebaseConfigJson.messagingSenderId,
-  appId: firebaseConfigJson.appId,
-  firestoreDatabaseId: firebaseConfigJson.firestoreDatabaseId,
+  apiKey: getSafeVal(import.meta.env.VITE_FIREBASE_API_KEY, firebaseConfigJson.apiKey),
+  authDomain: getSafeVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, firebaseConfigJson.authDomain),
+  projectId: getSafeVal(import.meta.env.VITE_FIREBASE_PROJECT_ID, firebaseConfigJson.projectId),
+  storageBucket: getSafeVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, firebaseConfigJson.storageBucket),
+  messagingSenderId: getSafeVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, firebaseConfigJson.messagingSenderId),
+  appId: getSafeVal(import.meta.env.VITE_FIREBASE_APP_ID, firebaseConfigJson.appId),
+  firestoreDatabaseId: getSafeVal(import.meta.env.VITE_FIREBASE_DATABASE_ID, firebaseConfigJson.firestoreDatabaseId),
 };
 
 export const isFirebaseConfigured = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey.length > 15);
