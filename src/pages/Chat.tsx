@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, User, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
+import { getApiUrl } from '../lib/utils';
 
 type Message = {
   role: 'user' | 'model';
@@ -32,7 +33,7 @@ export function Chat() {
     setIsTyping(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(getApiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

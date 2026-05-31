@@ -4,7 +4,7 @@ import { Brain, ArrowRight, Sparkles, Copy, CheckCircle2, ChevronRight, Save, Ex
 import { useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/utils';
+import { handleFirestoreError, OperationType, getApiUrl } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
 
 type Question = {
@@ -49,7 +49,7 @@ export function PromptBuilder() {
     setPhase(Phase.ANALYZING);
     setError(null);
     try {
-      const response = await fetch('/api/prompt-builder/question', {
+      const response = await fetch(getApiUrl('/api/prompt-builder/question'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,7 +82,7 @@ export function PromptBuilder() {
     setPhase(Phase.GENERATING);
     setError(null);
     try {
-      const response = await fetch('/api/prompt-builder/final-prompt', {
+      const response = await fetch(getApiUrl('/api/prompt-builder/final-prompt'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

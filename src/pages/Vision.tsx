@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Camera, Image as ImageIcon, UploadCloud, Sparkles, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import { getApiUrl } from '../lib/utils';
 
 export function Vision() {
   const [file, setFile] = useState<File | null>(null);
@@ -40,7 +41,7 @@ export function Vision() {
         const base64EncodedString = base64data.split(',')[1];
         
         try {
-          const response = await fetch('/api/vision', {
+          const response = await fetch(getApiUrl('/api/vision'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
