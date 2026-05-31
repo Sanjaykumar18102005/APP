@@ -3,7 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import app from './api/index';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Vite Middleware for integration dev server
 async function startViteMiddleware() {

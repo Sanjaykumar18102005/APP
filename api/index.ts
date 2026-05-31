@@ -1,12 +1,36 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import Groq from 'groq-sdk';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
 
+// Enable CORS for all requests so your Netlify frontend can talk to Render
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Root health-check route so Render and GET requests don't return 404
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'PromptGlow Backend API is running successfully!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api', (req, res) => {
+  res.json({
+    status: 'online',
+    endpoints: [
+      '/api/chat',
+      '/api/vision',
+      '/api/prompt-builder/question',
+      '/api/prompt-builder/final-prompt'
+    ]
+  });
+});
 
 // Lazy init of Groq SDK client
 let groqClient: Groq | null = null;
