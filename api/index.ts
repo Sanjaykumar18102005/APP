@@ -330,20 +330,33 @@ app.post('/api/vision', async (req, res) => {
 
     try {
       const groq = getGroqClient();
-      const promptText = userPrompt || `Analyze this image in deep technical detail. Provide a breakdown of its visual composition, lighting, art style, color palette, and key subject details. 
-Then, generate two production-ready prompts designed to recreate this image across ANY modern generative AI tool (Universal Compatibility):
+      const promptText = userPrompt || `Examine this image and generate a master, highly detailed, production-ready image generation prompt designed to recreate this image across ANY modern AI tool (Midjourney, DALL-E 3, Flux, Stable Diffusion).
 
-1) **Detailed Universal Prompt**: A robust, highly descriptive, multi-sentence prompt capturing layout, textures, ambient lighting, color gradients, medium style, and focal depth.
-2) **Brief Universal Prompt**: A short, punchy, tag-dense prompt designed to capture the core essence, vibe, and style in keywords and short phrases.
+Format your response strictly in Markdown as follows:
 
-Ensure the output is beautifully formatted in markdown.`;
+# Master Image Generation Prompt
+\`\`\`text
+[Put the complete, highly detailed universal image generation prompt here capturing subject, layout, composition, lighting, style, color palette, textures, camera angle, and fine details so it can be copied directly]
+\`\`\`
+
+### Brief Tag-Dense Prompt
+\`\`\`text
+[A concise, tag-dense version of the prompt]
+\`\`\`
+
+---
+
+### Visual Analysis & Breakdown
+- **Subject & Composition**: [Short explanation]
+- **Style & Medium**: [Short explanation]
+- **Color & Lighting**: [Short explanation]`;
 
       const response = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
         messages: [
           {
             role: "system",
-            content: "You are an expert AI vision analyst for PromptGlow. Output the analysis and refined prompts directly. Do NOT output internal thoughts or <think> tags."
+            content: "You are an expert AI vision prompt reverse-engineering copilot for PromptGlow. Directly output the master prompt first in a code block, followed by the brief prompt and a short analysis. Do NOT output internal thoughts or <think> tags."
           },
           {
             role: "user",
@@ -434,7 +447,7 @@ You MUST respond strictly in valid JSON format with the following keys:
 - "question": (string)
 - "options": (array of strings)
 
-Example output:
+Example output format:
 {
   "question": "What core style should we apply?",
   "options": [
@@ -449,11 +462,10 @@ Example output:
         messages: [
           {
             role: "system",
-            content: "You are a JSON generator API. Return ONLY valid JSON. Do NOT include <think> tags or internal commentary."
+            content: "You are a JSON generator API. Return ONLY raw JSON with keys 'question' and 'options'. Do NOT wrap in markdown or output <think> tags or internal commentary."
           },
           { role: "user", content: prompt }
-        ],
-        response_format: { type: "json_object" }
+        ]
       });
 
       let responseText = response.choices[0]?.message?.content || "{}";
