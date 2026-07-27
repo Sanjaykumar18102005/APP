@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { User, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
 import { isFirebaseConfigured, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserDocData } from '../lib/user-service';
 
@@ -18,20 +18,22 @@ export function Profile() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   
   useEffect(() => {
-    if (user && view === 'saved') {
+    if (user?.uid) {
       fetchPrompts(user.uid);
     }
-  }, [view, user]);
+  }, [user]);
 
   useEffect(() => {
     if (user?.uid && db && !user.isSandbox) {
-      getDoc(doc(db, 'users', user.uid))
-        .then(snap => {
-          if (snap.exists()) {
-            setUserDoc(snap.data() as UserDocData);
-          }
-        })
-        .catch(err => console.warn("Failed to fetch user doc:", err));
+      const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+        if (snap.exists()) {
+          setUserDoc(snap.data() as UserDocData);
+        }
+      }, (err) => {
+        console.warn("Realtime user doc error:", err);
+      });
+
+      return () => unsub();
     }
   }, [user]);
 
@@ -237,7 +239,7 @@ export function Profile() {
           {/* Metrics Grid */}
           <div className="grid grid-cols-3 gap-3">
             <div className="glass-panel p-4 text-center">
-              <span className="text-2xl font-bold font-mono text-primary-accent">{userDoc?.totalPromptsGenerated || 0}</span>
+              <span className="text-2xl font-bold font-mono text-primary-accent">{Math.max(userDoc?.totalPromptsGenerated || 0, prompts.length)}</span>
               <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Prompts</p>
             </div>
             <div className="glass-panel p-4 text-center">

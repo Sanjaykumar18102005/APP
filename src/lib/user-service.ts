@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, deleteField } from 'firebase/firestore';
 
 export interface UserPreferences {
   defaultTone: string;
@@ -48,7 +48,6 @@ export async function syncUserProfile(user: { uid: string; displayName?: string 
 
     if (snap.exists()) {
       const existingData = snap.data();
-      // Remove any legacy geminiConnected field if present
       let apiStatus = existingData.apiStatus || {};
       if ('geminiConnected' in apiStatus) {
         delete apiStatus.geminiConnected;
@@ -59,6 +58,12 @@ export async function syncUserProfile(user: { uid: string; displayName?: string 
         visionConnected: true,
         ...apiStatus
       };
+
+      if (existingData.apiStatus && 'geminiConnected' in existingData.apiStatus) {
+        await updateDoc(userRef, {
+          'apiStatus.geminiConnected': deleteField()
+        }).catch(err => console.warn("Could not delete geminiConnected:", err));
+      }
 
       const updatePayload = {
         displayName: user.displayName || existingData.displayName || 'Explorer',
@@ -122,12 +127,13 @@ export async function incrementUserStat(uid: string, statName: 'totalPromptsGene
 
   try {
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
+      uid,
       [statName]: increment(1),
       lastActiveAt: timestampMs,
       lastActiveAtISO: isoStr,
       lastActiveAtFormatted: formattedStr,
-    });
+    }, { merge: true });
   } catch (err) {
     console.warn(`Failed to increment ${statName}:`, err);
   }

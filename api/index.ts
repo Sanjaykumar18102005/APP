@@ -245,36 +245,34 @@ function getPromptBuilderQuestionFallback(initialIdea: string, answers: any[]): 
 }
 
 function getPromptBuilderFinalPromptFallback(initialIdea: string, answers: {q: string, a: string}[]): string {
-  const contextStr = answers.map((ans) => `- **${ans.q.replace("[Sandbox Mode] ", "").trim()}**: _${ans.a}_`).join('\n');
+  const contextStr = answers.map((ans) => `- **${ans.q.replace(/\[Sandbox Mode\]\s*/, "").trim()}**: _${ans.a}_`).join('\n');
   
-  return `# PROMPTTEMPLATE: EXPERT CORE ACTOR 🚀
-[⚠️ SANDBOX PERFORMANCE CONTEXT: Running in sandbox fallback because the Groq API key is expired or missing. To activate real-time intelligence, please renew your secrets.]
+  return `# PROMPT TEMPLATE: EXPERT CORE ARCHITECT 🚀
 
-## 🎭 Act as:
-You are an elite, world-class expert Prompt Architect and Executive Consultant specifically optimized for: "${initialIdea}"
+## 🎭 Role & Perspective:
+You are an elite, world-class expert Prompt Architect and Executive Consultant specifically assigned to: "${initialIdea}"
 
 ## 📋 Context & Requirements:
 ${contextStr}
 
 ## 🎯 Directives:
 1. Provide a premium, fully customized solution addressing the core task: "${initialIdea}".
-2. Adopt the selected tone, layout constraints, and constraints exactly as described above.
-3. Structure your output logically, starting with a 1-sentence strategic high-level summary, progressing to the main artifact, and concluding with 3 optimization tips for implementation.
-4. Maintain extreme precision, avoids generic placeholders, and uses rich technical terminology.
+2. Adopt the selected tone, layout constraints, and visual guidelines specified above.
+3. Structure your output logically: start with a scannable summary, progress to the main artifact, and conclude with implementation tips.
+4. Maintain extreme precision, avoid generic placeholders, and use high-impact terminology.
 
 ## 🛠️ Execution Protocol:
-- If a specific code block is generated, wrap it tightly in appropriate markdown syntax blocks.
-- If creative writing is desired, lead with deep emotional hooks.
-- If graphics/prompts are needed, specify precise lighting, medium, and parameters.
+- If code or structured data is requested, wrap it cleanly in markdown blocks.
+- If visual/image prompts are requested, specify precise lighting, composition, and parameters.
 
-## ⚡ Initiate Response immediately under this line:`;
+## ⚡ Initiate Response:`;
 }
 
 function stripThinking(text: string): string {
   if (!text) return "";
   let cleaned = text;
 
-  // 1. If text contains closing </think> tag, everything up to and including the last </think> tag is thought process
+  // 1. If text contains closing </think> tag, slice from after the last </think>
   if (cleaned.includes("</think>")) {
     cleaned = cleaned.substring(cleaned.lastIndexOf("</think>") + 8);
   }
@@ -282,15 +280,10 @@ function stripThinking(text: string): string {
   // 2. Remove any remaining <think>...</think> blocks or unclosed <think> tags
   cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
 
-  // 3. Remove residual reasoning step blocks like "7. **Final Output Generation:**" or "* No thinking tags"
-  cleaned = cleaned.replace(/^[\s\S]*?(?=(?:Act as|Create|Write|Design|A |An |You are|# |\*\*|Imagine|Generate|Given|Build))/i, (match) => {
-    if (/No thinking|Output Generation|thinking tags|step \d/i.test(match)) {
-      return "";
-    }
-    return match;
-  });
+  // 3. Strip any leading reasoning lines or meta commentary blocks
+  cleaned = cleaned.replace(/^(?:\s*[\*\-]?\s*(?:No thinking|Output Generation|thinking tags|step \d|Drafting|Proceed to|Final Output|Internal thought)[\s\S]*?\n)+/gi, '');
 
-  // 4. Clean leading/trailing quotes, dots, or stray whitespace
+  // 4. Remove leading quote marks or stray periods/whitespace
   cleaned = cleaned.trim();
   cleaned = cleaned.replace(/^["'.\s]+/, '');
 
@@ -502,12 +495,9 @@ Example output format:
       const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
       return res.json(JSON.parse(jsonStr));
     } catch (apiErr: any) {
-      if (isApiKeyError(apiErr)) {
-        console.warn("Using Sandbox Fallback for builder question due to API key error:", apiErr.message || apiErr);
-        const qData = getPromptBuilderQuestionFallback(initialIdea, answers || []);
-        return res.json(qData);
-      }
-      throw apiErr;
+      console.warn("Using Sandbox Fallback for builder question due to API error:", apiErr.message || apiErr);
+      const qData = getPromptBuilderQuestionFallback(initialIdea, answers || []);
+      return res.json(qData);
     }
   } catch (err: any) {
     console.error("Server PromptBuilder Question Error:", err);
@@ -545,14 +535,15 @@ The text response must strictly only contain the generated prompt. Do not add co
       });
 
       const rawText = response.choices[0]?.message?.content || "";
-      return res.json({ text: stripThinking(rawText) });
-    } catch (apiErr: any) {
-      if (isApiKeyError(apiErr)) {
-        console.warn("Using Sandbox Fallback for final prompt due to API key error:", apiErr.message || apiErr);
-        const text = getPromptBuilderFinalPromptFallback(initialIdea, answers || []);
-        return res.json({ text: stripThinking(text) });
+      const cleaned = stripThinking(rawText);
+      if (!cleaned) {
+        throw new Error("Model returned empty text");
       }
-      throw apiErr;
+      return res.json({ text: cleaned });
+    } catch (apiErr: any) {
+      console.warn("Using Fallback for final prompt due to API/model error:", apiErr.message || apiErr);
+      const text = getPromptBuilderFinalPromptFallback(initialIdea, answers || []);
+      return res.json({ text: stripThinking(text) });
     }
   } catch (err: any) {
     console.error("Server Final Prompt Error:", err);

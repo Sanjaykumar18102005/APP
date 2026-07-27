@@ -9,7 +9,7 @@ export function cleanOutput(text: string): string {
   if (!text) return "";
   let cleaned = text;
 
-  // 1. If text contains closing </think> tag, everything up to and including the last </think> tag is thought process
+  // 1. If text contains closing </think> tag, slice from after the last </think>
   if (cleaned.includes("</think>")) {
     cleaned = cleaned.substring(cleaned.lastIndexOf("</think>") + 8);
   }
@@ -17,15 +17,10 @@ export function cleanOutput(text: string): string {
   // 2. Remove any remaining <think>...</think> blocks or unclosed <think> tags
   cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
 
-  // 3. Remove residual reasoning step blocks like "7. **Final Output Generation:**" or "* No thinking tags"
-  cleaned = cleaned.replace(/^[\s\S]*?(?=(?:Act as|Create|Write|Design|A |An |You are|# |\*\*|Imagine|Generate|Given|Build))/i, (match) => {
-    if (/No thinking|Output Generation|thinking tags|step \d/i.test(match)) {
-      return "";
-    }
-    return match;
-  });
+  // 3. Strip any leading reasoning lines or meta commentary blocks
+  cleaned = cleaned.replace(/^(?:\s*[\*\-]?\s*(?:No thinking|Output Generation|thinking tags|step \d|Drafting|Proceed to|Final Output|Internal thought)[\s\S]*?\n)+/gi, '');
 
-  // 4. Clean leading/trailing quotes, dots, or stray whitespace
+  // 4. Remove leading quote marks or stray periods/whitespace
   cleaned = cleaned.trim();
   cleaned = cleaned.replace(/^["'.\s]+/, '');
 
