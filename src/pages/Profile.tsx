@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { User, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
+import { User, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft, Copy, Check, Trash2, X, Sparkles } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
 import { isFirebaseConfigured, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 import { UserDocData } from '../lib/user-service';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
@@ -16,6 +17,8 @@ export function Profile() {
   const [userDoc, setUserDoc] = useState<UserDocData | null>(null);
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
+  const [selectedItem, setSelectedItem] = useState<{ id?: string; title: string; content: string; category?: string; date?: string; type: 'saved' | 'history' } | null>(null);
+  const [copied, setCopied] = useState(false);
   
   useEffect(() => {
     if (user?.uid) {
@@ -99,23 +102,77 @@ export function Profile() {
      }
   };
 
+  const handleCopyText = (text: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDeletePrompt = async (id?: string) => {
+    if (!id) return;
+    if (user?.isSandbox) {
+      const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
+      const updated = sandboxPrompts.filter((p: any) => p.id !== id);
+      localStorage.setItem('sandbox_saved_prompts', JSON.stringify(updated));
+      setPrompts(updated);
+      setSelectedItem(null);
+      return;
+    }
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, "prompts", id));
+      setPrompts(prev => prev.filter(p => p.id !== id));
+      setSelectedItem(null);
+    } catch (err) {
+      console.error("Failed to delete prompt:", err);
+    }
+  };
+
   const renderContent = () => {
     if (view === 'saved') {
        return (
          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-            <button onClick={() => setView('main')} className="flex items-center gap-2 text-text-soft hover:text-[var(--text-main)] mb-4">
+            <button onClick={() => setView('main')} className="flex items-center gap-2 text-text-soft hover:text-[var(--text-main)] mb-4 cursor-pointer">
               <ChevronLeft className="w-5 h-5" /> Back
             </button>
-            <h3 className="text-2xl font-display font-bold mb-6">Saved Prompts</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-display font-bold">Saved Prompts</h3>
+              <span className="text-xs text-text-soft bg-glass-surface px-3 py-1 rounded-full border border-glass-border">
+                {prompts.length} {prompts.length === 1 ? 'Prompt' : 'Prompts'}
+              </span>
+            </div>
             {loading ? <p className="text-text-soft">Loading...</p> : (
               prompts.length === 0 ? <p className="text-text-soft">No saved prompts yet.</p> : (
                 <div className="grid gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
-                  {prompts.map(p => (
-                    <div key={p.id} className="glass-panel p-4">
-                       <h4 className="font-semibold mb-2">{p.title}</h4>
-                       <p className="text-xs text-text-soft font-mono line-clamp-3">{p.content}</p>
-                    </div>
-                  ))}
+                  {prompts.map(p => {
+                    const formattedDate = p.createdAtFormatted || (p.createdAt?.seconds ? new Date(p.createdAt.seconds * 1000).toLocaleString() : '');
+                    return (
+                      <div 
+                        key={p.id} 
+                        onClick={() => setSelectedItem({ id: p.id, title: p.title || 'Untitled Prompt', content: p.content, category: p.category, date: formattedDate, type: 'saved' })}
+                        className="glass-panel p-5 cursor-pointer hover:border-primary-accent/50 transition-all hover:scale-[1.01] group relative"
+                      >
+                         <div className="flex items-start justify-between gap-4 mb-2">
+                           <h4 className="font-semibold text-base group-hover:text-primary-accent transition-colors line-clamp-1">{p.title || 'Untitled Prompt'}</h4>
+                           <div className="flex items-center gap-2 shrink-0">
+                             <button
+                               onClick={(e) => handleCopyText(p.content, e)}
+                               title="Copy Prompt"
+                               className="p-1.5 rounded-lg bg-glass-surface hover:bg-glass-border text-text-soft hover:text-[var(--text-main)] transition-colors"
+                             >
+                               <Copy className="w-4 h-4" />
+                             </button>
+                           </div>
+                         </div>
+                         <p className="text-xs text-text-soft font-mono line-clamp-3 mb-3 leading-relaxed">{p.content}</p>
+                         <div className="flex items-center justify-between text-[11px] text-text-soft/80 font-mono">
+                           <span>{p.category || 'Generated'}</span>
+                           <span>{formattedDate}</span>
+                         </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )
             )}
@@ -126,23 +183,44 @@ export function Profile() {
     if (view === 'history') {
       return (
          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-            <button onClick={() => setView('main')} className="flex items-center gap-2 text-text-soft hover:text-[var(--text-main)] mb-4">
+            <button onClick={() => setView('main')} className="flex items-center gap-2 text-text-soft hover:text-[var(--text-main)] mb-4 cursor-pointer">
               <ChevronLeft className="w-5 h-5" /> Back
             </button>
-            <h3 className="text-2xl font-display font-bold mb-6">Recent History</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-display font-bold">Recent History</h3>
+              <span className="text-xs text-text-soft bg-glass-surface px-3 py-1 rounded-full border border-glass-border">
+                {historyItems.length} {historyItems.length === 1 ? 'Session' : 'Sessions'}
+              </span>
+            </div>
             {historyItems.length === 0 ? (
               <div className="glass-panel p-8 text-center text-text-soft">
                 No recent prompts generated locally.
               </div>
             ) : (
               <div className="grid gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
-                {historyItems.map((h, i) => (
-                  <div key={i} className="glass-panel p-4">
-                    <h4 className="font-semibold mb-2">{h.idea}</h4>
-                    <p className="text-xs text-text-soft font-mono line-clamp-3 mb-2">{h.prompt}</p>
-                    <span className="text-[10px] text-text-soft">{new Date(h.date).toLocaleString()}</span>
-                  </div>
-                ))}
+                {historyItems.map((h, i) => {
+                  const dateStr = h.date ? new Date(h.date).toLocaleString() : '';
+                  return (
+                    <div 
+                      key={i} 
+                      onClick={() => setSelectedItem({ title: h.idea || 'Generated Prompt', content: h.prompt, date: dateStr, type: 'history' })}
+                      className="glass-panel p-5 cursor-pointer hover:border-purple-500/50 transition-all hover:scale-[1.01] group relative"
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <h4 className="font-semibold text-base group-hover:text-purple-400 transition-colors line-clamp-1">{h.idea || 'Generated Prompt'}</h4>
+                        <button
+                          onClick={(e) => handleCopyText(h.prompt, e)}
+                          title="Copy Prompt"
+                          className="p-1.5 rounded-lg bg-glass-surface hover:bg-glass-border text-text-soft hover:text-[var(--text-main)] transition-colors shrink-0"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-text-soft font-mono line-clamp-3 mb-3 leading-relaxed">{h.prompt}</p>
+                      <span className="text-[10px] text-text-soft/80 font-mono">{dateStr}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
          </motion.div>
@@ -329,6 +407,73 @@ export function Profile() {
         <AnimatePresence mode="wait">
           <div key={view} className="w-full">
             {renderContent()}
+          </div>
+        </AnimatePresence>
+      )}
+
+      {selectedItem && (
+        <AnimatePresence>
+          <div 
+            onClick={() => setSelectedItem(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-panel w-full max-w-2xl max-h-[85vh] flex flex-col p-6 overflow-hidden relative shadow-2xl border border-glass-border bg-[var(--bg-surface)]"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between pb-4 mb-4 border-b border-glass-border">
+                <div className="space-y-1 pr-6">
+                  <h3 className="text-xl font-bold font-display break-words">{selectedItem.title}</h3>
+                  <div className="flex items-center gap-3 text-xs text-text-soft">
+                    {selectedItem.category && (
+                      <span className="px-2 py-0.5 rounded bg-primary-accent/10 text-primary-accent border border-primary-accent/20">
+                        {selectedItem.category}
+                      </span>
+                    )}
+                    {selectedItem.date && <span>{selectedItem.date}</span>}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedItem(null)}
+                  className="p-1.5 rounded-lg bg-glass-surface hover:bg-glass-border text-text-soft hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-4 rounded-xl bg-black/40 border border-glass-border font-mono text-xs md:text-sm leading-relaxed whitespace-pre-wrap select-text mb-6">
+                <div className="markdown-body">
+                  <ReactMarkdown>{selectedItem.content}</ReactMarkdown>
+                </div>
+              </div>
+
+              {/* Footer / Actions */}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                {selectedItem.type === 'saved' && selectedItem.id ? (
+                  <button
+                    onClick={() => handleDeletePrompt(selectedItem.id)}
+                    className="px-4 py-2 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-xs md:text-sm font-medium flex items-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete Prompt
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleCopyText(selectedItem.content)}
+                    className="px-5 py-2.5 rounded-xl bg-primary-accent hover:bg-primary-accent/90 text-white font-semibold transition-all shadow-lg flex items-center gap-2 text-xs md:text-sm cursor-pointer"
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy Prompt'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </AnimatePresence>
       )}
