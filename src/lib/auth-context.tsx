@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, isFirebaseConfigured, signInWithGoogle, signOut as firebaseSignOut } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { syncUserProfile } from './user-service';
 
 export interface UserProfile {
   uid: string;
@@ -44,12 +45,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (firebaseUser) {
-        setUser({
+        const u = {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName,
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL,
-        });
+        };
+        setUser(u);
+        syncUserProfile(u).catch(err => console.warn("Failed to sync profile:", err));
       } else {
         setUser(null);
       }

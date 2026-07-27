@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType, getApiUrl, cleanOutput } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
+import { incrementUserStat } from '../lib/user-service';
 
 type Question = {
   question: string;
@@ -138,6 +139,7 @@ export function PromptBuilder() {
   const handleSave = async () => {
     if (!user || saved) return;
     try {
+      const now = new Date();
       if (user.isSandbox) {
         const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
         const newPrompt = {
@@ -146,7 +148,9 @@ export function PromptBuilder() {
           title: initialIdea.substring(0, 90) || "Untitled Prompt",
           content: finalPrompt.substring(0, 9900),
           category: "Generated",
-          createdAt: { seconds: Math.floor(Date.now() / 1000) }
+          createdAt: now.getTime(),
+          createdAtISO: now.toISOString(),
+          createdAtFormatted: now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
         };
         sandboxPrompts.unshift(newPrompt);
         localStorage.setItem('sandbox_saved_prompts', JSON.stringify(sandboxPrompts));
@@ -160,9 +164,12 @@ export function PromptBuilder() {
         title: initialIdea.substring(0, 90) || "Untitled Prompt",
         content: finalPrompt.substring(0, 9900),
         category: "Generated",
-        createdAt: serverTimestamp(),
+        createdAt: now.getTime(),
+        createdAtISO: now.toISOString(),
+        createdAtFormatted: now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
       });
       setSaved(true);
+      incrementUserStat(user.uid, 'totalPromptsGenerated').catch(console.warn);
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, "prompts");
       console.error(err);

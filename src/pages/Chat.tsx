@@ -3,6 +3,8 @@ import { Send, User, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { getApiUrl, cleanOutput } from '../lib/utils';
+import { useAuth } from '../lib/auth-context';
+import { incrementUserStat } from '../lib/user-service';
 
 type Message = {
   role: 'user' | 'model';
@@ -10,6 +12,7 @@ type Message = {
 };
 
 export function Chat() {
+  const { user } = useAuth();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     { role: 'model', content: "Hello! I am your AI assistant in PromptGlow. You can chat with me normally here, brainstorm ideas, or ask for coding help!" }
@@ -51,6 +54,9 @@ export function Chat() {
 
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'model', content: cleanOutput(data.text || "Error: Empty response") }]);
+      if (user?.uid) {
+        incrementUserStat(user.uid, 'totalChats').catch(console.warn);
+      }
       
     } catch (err: any) {
       console.error("Chat Error:", err);

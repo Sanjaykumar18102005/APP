@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { User, LogOut, LayoutList, History, Settings, CreditCard, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
 import { isFirebaseConfigured, db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { UserDocData } from '../lib/user-service';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
 
@@ -12,6 +13,7 @@ export function Profile() {
   const [view, setView] = useState<ViewMode>('main');
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [userDoc, setUserDoc] = useState<UserDocData | null>(null);
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   
@@ -20,6 +22,18 @@ export function Profile() {
       fetchPrompts(user.uid);
     }
   }, [view, user]);
+
+  useEffect(() => {
+    if (user?.uid && db && !user.isSandbox) {
+      getDoc(doc(db, 'users', user.uid))
+        .then(snap => {
+          if (snap.exists()) {
+            setUserDoc(snap.data() as UserDocData);
+          }
+        })
+        .catch(err => console.warn("Failed to fetch user doc:", err));
+    }
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -193,21 +207,47 @@ export function Profile() {
          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
          className="space-y-6"
        >
-          <div className="glass-panel p-8 flex items-center gap-6 relative overflow-hidden">
+          <div className="glass-panel p-8 flex flex-col md:flex-row items-start md:items-center gap-6 relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                <SparklesBackground />
              </div>
              {user?.photoURL ? (
-               <img src={user.photoURL} alt={user.displayName || "User"} className="w-20 h-20 rounded-full border-2 border-primary-accent" />
+               <img src={user.photoURL} alt={user.displayName || "User"} className="w-20 h-20 rounded-full border-2 border-primary-accent shrink-0" />
              ) : (
-               <div className="w-20 h-20 rounded-full bg-primary-accent/20 flex items-center justify-center border-2 border-primary-accent">
+               <div className="w-20 h-20 rounded-full bg-primary-accent/20 flex items-center justify-center border-2 border-primary-accent shrink-0">
                  <User className="w-8 h-8 text-primary-accent" />
                </div>
              )}
-             <div className="z-10 flex-1 min-w-0">
-               <h2 className="text-xl md:text-2xl font-display font-bold break-words">{user?.displayName || "Explorer"}</h2>
+             <div className="z-10 flex-1 min-w-0 space-y-1">
+               <div className="flex items-center gap-3">
+                 <h2 className="text-xl md:text-2xl font-display font-bold break-words">{user?.displayName || "Explorer"}</h2>
+                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary-accent/20 text-secondary-accent border border-secondary-accent/30 uppercase tracking-wider">
+                   {userDoc?.plan || 'Free'} Plan
+                 </span>
+               </div>
                <p className="text-text-soft text-xs md:text-sm truncate">{user?.email}</p>
+               {userDoc?.lastActiveAtFormatted && (
+                 <p className="text-[11px] text-text-soft/80 font-mono pt-1">
+                   Last active: {userDoc.lastActiveAtFormatted}
+                 </p>
+               )}
              </div>
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="glass-panel p-4 text-center">
+              <span className="text-2xl font-bold font-mono text-primary-accent">{userDoc?.totalPromptsGenerated || 0}</span>
+              <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Prompts</p>
+            </div>
+            <div className="glass-panel p-4 text-center">
+              <span className="text-2xl font-bold font-mono text-blue-400">{userDoc?.totalChats || 0}</span>
+              <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Chats</p>
+            </div>
+            <div className="glass-panel p-4 text-center">
+              <span className="text-2xl font-bold font-mono text-secondary-accent">{userDoc?.totalVisionAnalyzed || 0}</span>
+              <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Vision Scans</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

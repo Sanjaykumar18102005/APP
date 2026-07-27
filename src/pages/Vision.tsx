@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Camera, Image as ImageIcon, UploadCloud, Sparkles, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { Camera, Image as ImageIcon, UploadCloud, Sparkles, ExternalLink, Copy, CheckCircle2, Ratio } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { getApiUrl, cleanOutput } from '../lib/utils';
+import { useAuth } from '../lib/auth-context';
+import { incrementUserStat } from '../lib/user-service';
 
 export function Vision() {
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number; ratio: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState("");
   const [copied, setCopied] = useState(false);
@@ -18,12 +22,47 @@ export function Vision() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const calculateRatio = (w: number, h: number): string => {
+    if (!w || !h) return "16:9";
+    const r = w / h;
+    const standardRatios = [
+      { name: "1:1", val: 1 },
+      { name: "16:9", val: 16 / 9 },
+      { name: "9:16", val: 9 / 16 },
+      { name: "4:3", val: 4 / 3 },
+      { name: "3:4", val: 3 / 4 },
+      { name: "3:2", val: 3 / 2 },
+      { name: "2:3", val: 2 / 3 },
+      { name: "21:9", val: 21 / 9 },
+    ];
+    let closest = standardRatios[0];
+    let minDiff = Math.abs(r - closest.val);
+    for (const item of standardRatios) {
+      const diff = Math.abs(r - item.val);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = item;
+      }
+    }
+    return closest.name;
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setPreview(objectUrl);
       setResult("");
+
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const ratio = calculateRatio(w, h);
+        setDimensions({ width: w, height: h, ratio });
+      };
+      img.src = objectUrl;
     }
   };
 
@@ -32,12 +71,10 @@ export function Vision() {
     setIsAnalyzing(true);
     
     try {
-      // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onloadend = async () => {
         const base64data = reader.result as string;
-        // Split data:image/jpeg;base64,...
         const base64EncodedString = base64data.split(',')[1];
         
         try {
@@ -46,7 +83,9 @@ export function Vision() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               imageBase64: base64EncodedString,
-              mimeType: file.type
+              mimeType: file.type,
+              aspectRatio: dimensions?.ratio || "16:9",
+              resolution: dimensions ? `${dimensions.width}x${dimensions.height}` : undefined
             })
           });
 
@@ -57,6 +96,9 @@ export function Vision() {
 
           const data = await response.json();
           setResult(cleanOutput(data.text || "Could not analyze the image."));
+          if (user?.uid) {
+            incrementUserStat(user.uid, 'totalVisionAnalyzed').catch(console.warn);
+          }
         } catch (err: any) {
           console.error("Vision Error:", err);
           setResult(`Error contacting AI server: ${err.message || 'Unknown Error'}`);
@@ -77,7 +119,7 @@ export function Vision() {
           <Camera className="w-8 h-8 text-secondary-accent" />
           Vision Reverse Engineering
         </h1>
-        <p className="text-text-soft">Upload an image. We'll extract its DNA and give you the prompt to recreate it.</p>
+        <p className="text-text-soft">Upload an image. We'll extract its DNA, aspect ratio, and give you the prompt to recreate it.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -88,6 +130,12 @@ export function Vision() {
                   <>
                     <img src={preview} alt="Upload preview" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
                     <div className="absolute inset-0 bg-gradient-to-t from-bg-surface/80 to-transparent" />
+                    {dimensions && (
+                      <div className="absolute top-3 left-3 z-10 px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-xs text-secondary-accent font-mono border border-secondary-accent/30 flex items-center gap-1.5 shadow-lg">
+                        <Ratio className="w-3.5 h-3.5" />
+                        <span>Ratio: <strong>{dimensions.ratio}</strong> ({dimensions.width}×{dimensions.height})</span>
+                      </div>
+                    )}
                     <div className="absolute bottom-4 flex items-center gap-2 text-white font-medium z-10 px-4 py-2 bg-black/50 backdrop-blur-md rounded-full">
                       <UploadCloud className="w-4 h-4" /> Change Image
                     </div>

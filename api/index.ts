@@ -272,9 +272,29 @@ ${contextStr}
 
 function stripThinking(text: string): string {
   if (!text) return "";
-  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '').trim();
-  return cleaned;
+  let cleaned = text;
+
+  // 1. If text contains closing </think> tag, everything up to and including the last </think> tag is thought process
+  if (cleaned.includes("</think>")) {
+    cleaned = cleaned.substring(cleaned.lastIndexOf("</think>") + 8);
+  }
+
+  // 2. Remove any remaining <think>...</think> blocks or unclosed <think> tags
+  cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+
+  // 3. Remove residual reasoning step blocks like "7. **Final Output Generation:**" or "* No thinking tags"
+  cleaned = cleaned.replace(/^[\s\S]*?(?=(?:Act as|Create|Write|Design|A |An |You are|# |\*\*|Imagine|Generate|Given|Build))/i, (match) => {
+    if (/No thinking|Output Generation|thinking tags|step \d/i.test(match)) {
+      return "";
+    }
+    return match;
+  });
+
+  // 4. Clean leading/trailing quotes, dots, or stray whitespace
+  cleaned = cleaned.trim();
+  cleaned = cleaned.replace(/^["'.\s]+/, '');
+
+  return cleaned.trim();
 }
 
 // ==================== END FALLBACK GENERATORS ====================
@@ -323,40 +343,48 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/vision', async (req, res) => {
   try {
-    const { imageBase64, mimeType, prompt: userPrompt } = req.body;
+    const { imageBase64, mimeType, prompt: userPrompt, aspectRatio, resolution } = req.body;
     if (!imageBase64 || !mimeType) {
       return res.status(400).json({ error: "Missing 'imageBase64' or 'mimeType' field." });
     }
 
+    const detectedRatio = aspectRatio || "16:9";
+    const detectedRes = resolution || "Detected from image dimensions";
+
     try {
       const groq = getGroqClient();
-      const promptText = userPrompt || `Examine this image and generate a master, highly detailed, production-ready image generation prompt designed to recreate this image across ANY modern AI tool (Midjourney, DALL-E 3, Flux, Stable Diffusion).
+      const promptText = userPrompt || `Examine this image in detail. The image has a detected aspect ratio of ${detectedRatio} (${detectedRes}).
+
+Generate a master, highly detailed, production-ready image generation prompt designed to recreate this exact image across ANY modern AI tool (Midjourney, DALL-E 3, Flux, Stable Diffusion).
+
+CRITICAL REQUIREMENT: You MUST append the aspect ratio tag \`--ar ${detectedRatio}\` at the end of both the Master Prompt and Brief Prompt!
 
 Format your response strictly in Markdown as follows:
 
 # Master Image Generation Prompt
 \`\`\`text
-[Put the complete, highly detailed universal image generation prompt here capturing subject, layout, composition, lighting, style, color palette, textures, camera angle, and fine details so it can be copied directly]
+[Put the complete, highly detailed universal image generation prompt here capturing subject, layout, composition, lighting, style, color palette, textures, camera angle, fine details, ending explicitly with --ar ${detectedRatio}]
 \`\`\`
 
 ### Brief Tag-Dense Prompt
 \`\`\`text
-[A concise, tag-dense version of the prompt]
+[A concise, tag-dense version of the prompt, ending explicitly with --ar ${detectedRatio}]
 \`\`\`
 
 ---
 
 ### Visual Analysis & Breakdown
-- **Subject & Composition**: [Short explanation]
-- **Style & Medium**: [Short explanation]
-- **Color & Lighting**: [Short explanation]`;
+- **Aspect Ratio & Dimensions**: ${detectedRatio} (${detectedRes})
+- **Subject & Composition**: [Short explanation of subject placement, framing, and layout]
+- **Style & Medium**: [Short explanation of artistic style, medium, and rendering technique]
+- **Color & Lighting**: [Short explanation of lighting, color palette, and mood]`;
 
       const response = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
         messages: [
           {
             role: "system",
-            content: "You are an expert AI vision prompt reverse-engineering copilot for PromptGlow. Directly output the master prompt first in a code block, followed by the brief prompt and a short analysis. Do NOT output internal thoughts or <think> tags."
+            content: "You are an expert AI vision prompt reverse-engineering copilot for PromptGlow. Directly output the master prompt first in a code block with aspect ratio parameters (--ar ...), followed by the brief prompt and a short analysis. Do NOT output internal thoughts or <think> tags."
           },
           {
             role: "user",

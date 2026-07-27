@@ -2,15 +2,27 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile data",
+      "description": "Optimized user profile data in PromptGlow",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "avatarUrl": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "photoURL": { "type": "string" },
+        "plan": { "type": "string" },
+        "totalPromptsGenerated": { "type": "integer" },
+        "totalChats": { "type": "integer" },
+        "totalVisionAnalyzed": { "type": "integer" },
+        "createdAt": { "type": "integer" },
+        "createdAtISO": { "type": "string", "format": "date-time" },
+        "createdAtFormatted": { "type": "string" },
+        "lastActiveAt": { "type": "integer" },
+        "lastActiveAtISO": { "type": "string", "format": "date-time" },
+        "lastActiveAtFormatted": { "type": "string" },
+        "preferences": { "type": "object" },
+        "apiStatus": { "type": "object" }
       },
-      "required": ["email", "createdAt"]
+      "required": ["uid", "createdAt", "createdAtISO", "lastActiveAt"]
     },
     "Prompt": {
       "title": "Prompt",
@@ -21,16 +33,17 @@
         "title": { "type": "string" },
         "content": { "type": "string" },
         "category": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string" },
+        "createdAtISO": { "type": "string", "format": "date-time" },
+        "createdAtFormatted": { "type": "string" }
       },
-      "required": ["userId", "title", "content", "createdAt"]
+      "required": ["userId", "title", "content"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
-      "description": "User profile data"
+      "description": "Optimized user profile documents"
     },
     "/prompts/{promptId}": {
       "schema": { "$ref": "#/entities/Prompt" },

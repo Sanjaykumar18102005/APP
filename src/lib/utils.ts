@@ -7,9 +7,29 @@ export function cn(...inputs: ClassValue[]) {
 
 export function cleanOutput(text: string): string {
   if (!text) return "";
-  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '').trim();
-  return cleaned;
+  let cleaned = text;
+
+  // 1. If text contains closing </think> tag, everything up to and including the last </think> tag is thought process
+  if (cleaned.includes("</think>")) {
+    cleaned = cleaned.substring(cleaned.lastIndexOf("</think>") + 8);
+  }
+
+  // 2. Remove any remaining <think>...</think> blocks or unclosed <think> tags
+  cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+
+  // 3. Remove residual reasoning step blocks like "7. **Final Output Generation:**" or "* No thinking tags"
+  cleaned = cleaned.replace(/^[\s\S]*?(?=(?:Act as|Create|Write|Design|A |An |You are|# |\*\*|Imagine|Generate|Given|Build))/i, (match) => {
+    if (/No thinking|Output Generation|thinking tags|step \d/i.test(match)) {
+      return "";
+    }
+    return match;
+  });
+
+  // 4. Clean leading/trailing quotes, dots, or stray whitespace
+  cleaned = cleaned.trim();
+  cleaned = cleaned.replace(/^["'.\s]+/, '');
+
+  return cleaned.trim();
 }
 
 export function getApiUrl(path: string): string {
