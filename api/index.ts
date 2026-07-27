@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import Groq, { toFile } from 'groq-sdk';
 import cors from 'cors';
 
 dotenv.config();
@@ -26,6 +26,7 @@ app.get('/api', (req, res) => {
     endpoints: [
       '/api/chat',
       '/api/vision',
+      '/api/transcribe',
       '/api/prompt-builder/question',
       '/api/prompt-builder/final-prompt'
     ]
@@ -290,7 +291,7 @@ app.post('/api/chat', async (req, res) => {
       ];
 
       const response = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: "qwen/qwen3.6-27b",
         messages: formattedMessages,
       });
 
@@ -311,28 +312,30 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/vision', async (req, res) => {
   try {
-    const { imageBase64, mimeType } = req.body;
+    const { imageBase64, mimeType, prompt: userPrompt } = req.body;
     if (!imageBase64 || !mimeType) {
       return res.status(400).json({ error: "Missing 'imageBase64' or 'mimeType' field." });
     }
 
     try {
       const groq = getGroqClient();
+      const promptText = userPrompt || `Analyze this image in deep technical detail. Provide a breakdown of its visual composition, lighting, art style, color palette, and key subject details. 
+Then, generate two production-ready prompts designed to recreate this image across ANY modern generative AI tool (Universal Compatibility):
+
+1) **Detailed Universal Prompt**: A robust, highly descriptive, multi-sentence prompt capturing layout, textures, ambient lighting, color gradients, medium style, and focal depth.
+2) **Brief Universal Prompt**: A short, punchy, tag-dense prompt designed to capture the core essence, vibe, and style in keywords and short phrases.
+
+Ensure the output is beautifully formatted in markdown.`;
+
       const response = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: "qwen/qwen3.6-27b",
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Analyze this image in deep technical detail. Provide a breakdown of its visual composition, lighting, art style, color palette, and key subject details. 
-Then, generate two production-ready prompts designed to recreate this image across ANY modern generative AI tool (Universal Compatibility):
-
-1) **Detailed Universal Prompt**: A robust, highly descriptive, multi-sentence prompt capturing layout, textures, ambient lighting, color gradients, medium style, and focal depth.
-2) **Brief Universal Prompt**: A short, punchy, tag-dense prompt designed to capture the core essence, vibe, and style in keywords and short phrases.
-
-Ensure the output is beautifully formatted in markdown.`
+                text: promptText
               },
               {
                 type: "image_url",
@@ -356,6 +359,37 @@ Ensure the output is beautifully formatted in markdown.`
     }
   } catch (err: any) {
     console.error("Server Vision Error:", err);
+    res.status(500).json({ error: formatServerError(err) });
+  }
+});
+
+app.post('/api/transcribe', async (req, res) => {
+  try {
+    const { audioBase64, filename } = req.body;
+    if (!audioBase64) {
+      return res.status(400).json({ error: "Missing 'audioBase64' field in request body." });
+    }
+
+    try {
+      const groq = getGroqClient();
+      const buffer = Buffer.from(audioBase64, 'base64');
+      const file = await toFile(buffer, filename || 'audio.wav');
+      const transcription = await groq.audio.transcriptions.create({
+        file,
+        model: "whisper-large-v3-turbo",
+        response_format: "json"
+      });
+
+      return res.json({ text: transcription.text || "" });
+    } catch (apiErr: any) {
+      if (isApiKeyError(apiErr)) {
+        console.warn("Using Fallback for transcribe due to API key error:", apiErr.message || apiErr);
+        return res.json({ text: "Sample audio transcription text (sandbox mode)." });
+      }
+      throw apiErr;
+    }
+  } catch (err: any) {
+    console.error("Server Transcribe Error:", err);
     res.status(500).json({ error: formatServerError(err) });
   }
 });
@@ -395,7 +429,7 @@ Example output:
 }`;
 
       const response = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: "qwen/qwen3.6-27b",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }
       });
@@ -435,7 +469,7 @@ ${historyStr}
 The text response must strictly only contain the generated prompt. Do not add conversational prefixes or wrapping markdown text unless specified.`;
 
       const response = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: "qwen/qwen3.6-27b",
         messages: [{ role: "user", content: prompt }],
       });
 
