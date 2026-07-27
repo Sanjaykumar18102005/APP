@@ -4,7 +4,7 @@ import { Brain, ArrowRight, Sparkles, Copy, CheckCircle2, ChevronRight, Save, Ex
 import { useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType, getApiUrl } from '../lib/utils';
+import { handleFirestoreError, OperationType, getApiUrl, cleanOutput } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
 
 type Question = {
@@ -97,7 +97,7 @@ export function PromptBuilder() {
       }
 
       const data = await response.json();
-      setFinalPrompt(data.text || "Failed to generate prompt.");
+      setFinalPrompt(cleanOutput(data.text || "Failed to generate prompt."));
       setPhase(Phase.RESULT);
     } catch (err: any) {
       console.error("Final Prompt Error:", err);

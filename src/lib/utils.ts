@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function cleanOutput(text: string): string {
+  if (!text) return "";
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '').trim();
+  return cleaned;
+}
+
 export function getApiUrl(path: string): string {
   const base = (import.meta.env.VITE_API_BASE_URL || "").trim();
   if (base) {

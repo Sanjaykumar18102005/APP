@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, User, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { getApiUrl } from '../lib/utils';
+import { getApiUrl, cleanOutput } from '../lib/utils';
 
 type Message = {
   role: 'user' | 'model';
@@ -50,7 +50,7 @@ export function Chat() {
       }
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'model', content: data.text || "Error: Empty response" }]);
+      setMessages(prev => [...prev, { role: 'model', content: cleanOutput(data.text || "Error: Empty response") }]);
       
     } catch (err: any) {
       console.error("Chat Error:", err);

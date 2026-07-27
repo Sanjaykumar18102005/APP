@@ -270,6 +270,13 @@ ${contextStr}
 ## ⚡ Initiate Response immediately under this line:`;
 }
 
+function stripThinking(text: string): string {
+  if (!text) return "";
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '').trim();
+  return cleaned;
+}
+
 // ==================== END FALLBACK GENERATORS ====================
 
 // API Routes
@@ -283,7 +290,10 @@ app.post('/api/chat', async (req, res) => {
     try {
       const groq = getGroqClient();
       const formattedMessages = [
-        { role: 'system' as const, content: "You are a helpful, expert AI assistant within an app called PromptGlow. Provide constructive, insightful feedback." },
+        { 
+          role: 'system' as const, 
+          content: "You are a friendly, helpful, and conversational AI assistant within PromptGlow. Respond naturally as a chatbot answering the user's questions or chatting directly. Do NOT output internal thoughts or <think> tags." 
+        },
         ...messages.map((msg: any) => ({
           role: (msg.role === 'model' || msg.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
           content: msg.content
@@ -295,12 +305,13 @@ app.post('/api/chat', async (req, res) => {
         messages: formattedMessages,
       });
 
-      return res.json({ text: response.choices[0]?.message?.content || "" });
+      const rawText = response.choices[0]?.message?.content || "";
+      return res.json({ text: stripThinking(rawText) });
     } catch (apiErr: any) {
       if (isApiKeyError(apiErr)) {
         console.warn("Using Sandbox Fallback for chat due to API key error:", apiErr.message || apiErr);
         const text = getChatFallback(messages);
-        return res.json({ text });
+        return res.json({ text: stripThinking(text) });
       }
       throw apiErr;
     }
@@ -331,6 +342,10 @@ Ensure the output is beautifully formatted in markdown.`;
         model: "qwen/qwen3.6-27b",
         messages: [
           {
+            role: "system",
+            content: "You are an expert AI vision analyst for PromptGlow. Output the analysis and refined prompts directly. Do NOT output internal thoughts or <think> tags."
+          },
+          {
             role: "user",
             content: [
               {
@@ -348,12 +363,13 @@ Ensure the output is beautifully formatted in markdown.`;
         ]
       });
 
-      return res.json({ text: response.choices[0]?.message?.content || "" });
+      const rawText = response.choices[0]?.message?.content || "";
+      return res.json({ text: stripThinking(rawText) });
     } catch (apiErr: any) {
       if (isApiKeyError(apiErr)) {
         console.warn("Using Sandbox Fallback for vision due to API key error:", apiErr.message || apiErr);
         const text = getVisionFallback();
-        return res.json({ text });
+        return res.json({ text: stripThinking(text) });
       }
       throw apiErr;
     }
@@ -380,7 +396,7 @@ app.post('/api/transcribe', async (req, res) => {
         response_format: "json"
       });
 
-      return res.json({ text: transcription.text || "" });
+      return res.json({ text: stripThinking(transcription.text || "") });
     } catch (apiErr: any) {
       if (isApiKeyError(apiErr)) {
         console.warn("Using Fallback for transcribe due to API key error:", apiErr.message || apiErr);
@@ -430,12 +446,21 @@ Example output:
 
       const response = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          {
+            role: "system",
+            content: "You are a JSON generator API. Return ONLY valid JSON. Do NOT include <think> tags or internal commentary."
+          },
+          { role: "user", content: prompt }
+        ],
         response_format: { type: "json_object" }
       });
 
-      const responseText = response.choices[0]?.message?.content || "{}";
-      return res.json(JSON.parse(responseText));
+      let responseText = response.choices[0]?.message?.content || "{}";
+      responseText = stripThinking(responseText);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+      return res.json(JSON.parse(jsonStr));
     } catch (apiErr: any) {
       if (isApiKeyError(apiErr)) {
         console.warn("Using Sandbox Fallback for builder question due to API key error:", apiErr.message || apiErr);
@@ -466,19 +491,26 @@ Initial idea: "${initialIdea}"
 Context:
 ${historyStr}
 
-The text response must strictly only contain the generated prompt. Do not add conversational prefixes or wrapping markdown text unless specified.`;
+The text response must strictly only contain the generated prompt. Do not add conversational prefixes, wrapping markdown meta text, internal thinking, or <think> tags.`;
 
       const response = await groq.chat.completions.create({
         model: "qwen/qwen3.6-27b",
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          {
+            role: "system",
+            content: "You output ONLY the refined prompt itself directly. Do NOT output internal thoughts or <think> tags."
+          },
+          { role: "user", content: prompt }
+        ],
       });
 
-      return res.json({ text: response.choices[0]?.message?.content || "" });
+      const rawText = response.choices[0]?.message?.content || "";
+      return res.json({ text: stripThinking(rawText) });
     } catch (apiErr: any) {
       if (isApiKeyError(apiErr)) {
         console.warn("Using Sandbox Fallback for final prompt due to API key error:", apiErr.message || apiErr);
         const text = getPromptBuilderFinalPromptFallback(initialIdea, answers || []);
-        return res.json({ text });
+        return res.json({ text: stripThinking(text) });
       }
       throw apiErr;
     }

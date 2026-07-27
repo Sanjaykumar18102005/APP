@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Camera, Image as ImageIcon, UploadCloud, Sparkles, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { getApiUrl } from '../lib/utils';
+import { getApiUrl, cleanOutput } from '../lib/utils';
 
 export function Vision() {
   const [file, setFile] = useState<File | null>(null);
@@ -56,7 +56,7 @@ export function Vision() {
           }
 
           const data = await response.json();
-          setResult(data.text || "Could not analyze the image.");
+          setResult(cleanOutput(data.text || "Could not analyze the image."));
         } catch (err: any) {
           console.error("Vision Error:", err);
           setResult(`Error contacting AI server: ${err.message || 'Unknown Error'}`);
