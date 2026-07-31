@@ -1,0 +1,18 @@
+{
+  "name": "promptglow-e2e-tests",
+  "version": "1.0.0",
+  "description": "300 Test Cases Web E2E and API Integration Test Suite for PromptGlow",
+  "main": "runner.ts",
+  "scripts": {
+    "test": "npx tsx runner.ts",
+    "test:web": "npx tsx runner.ts"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "tsx": "^4.19.2"
+  }
+}

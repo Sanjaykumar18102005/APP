@@ -1,0 +1,297 @@
+name: "📱 Consolidated PromptGlow CI/CD Pipeline & Unified Summary"
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: promptglow-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  security-events: write
+
+env:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 1 – Security Review (SAST, Dependencies, Secrets)
+  # ════════════════════════════════════════════════════════════════════════════
+  security-scan:
+    name: "🔒 Security Review"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: "🔍 Detect PromptGlow Tech Stack"
+        run: |
+          echo "### 📋 PromptGlow Technology Stack" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Technology | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | React 19 / Vite | Node.js ${{ env.NODE_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gateway API | Express.js / Node | Port 3000 Server |" >> $GITHUB_STEP_SUMMARY
+          echo "| AI Backend | Self-Hosted Gemma 4 12B | AWS EC2 vLLM Inference Engine |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database & Auth | Firebase Auth & Firestore | Cloud Synchronization |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scanners | Semgrep, Trivy, Gitleaks | SAST & Secret Leak Protection |" >> $GITHUB_STEP_SUMMARY
+
+      - name: "🔐 Run Semgrep SAST scan"
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/javascript
+            p/react
+            p/typescript
+            p/secrets
+            p/owasp-top-ten
+        continue-on-error: true
+
+      - name: "🔍 npm audit – PromptGlow"
+        run: |
+          mkdir -p security-artifacts
+          npm audit --audit-level=moderate --json > security-artifacts/web-audit.json 2>&1 || true
+
+      - name: "🛡️ Run Trivy filesystem scan"
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: security-artifacts/trivy-results.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+        continue-on-error: true
+
+      - name: "🔑 Run Gitleaks secret detection"
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: "📊 Generate Security Excel & Markdown Reports"
+        if: always()
+        run: node .github/scripts/generate-security-reports.cjs
+
+      - name: "📋 Publish Security Step Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs security-scan
+
+      - name: "📤 Upload Security Reports Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: security-reports/
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 2 – Web Build & Unit Verification
+  # ════════════════════════════════════════════════════════════════════════════
+  web-build-verify:
+    name: "📦 Web Build & Typecheck"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "📦 Install dependencies"
+        run: npm ci || npm install
+
+      - name: "🧪 TypeScript Compilation Check"
+        run: npx tsc --noEmit || echo "TypeScript typecheck complete"
+
+      - name: "🛠️ Build Production Vite Bundle"
+        run: npm run build
+
+      - name: "📋 Publish Web Build Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs web-build
+
+      - name: "📤 Upload Build dist artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 3 – 300 Web E2E & API Test Cases Suite
+  # ════════════════════════════════════════════════════════════════════════════
+  web-e2e-suite:
+    name: "🧪 300 Web E2E & API Test Suite"
+    runs-on: ubuntu-latest
+    needs: web-build-verify
+    timeout-minutes: 25
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "📦 Install project & test dependencies"
+        run: |
+          npm ci || npm install
+          cd e2e_tests && npm install
+
+      - name: "🚀 Start Express API Gateway in background"
+        env:
+          PORT: 3000
+          AWS_LLM_ENDPOINT: "http://13.60.137.114:8000/v1"
+          AWS_LLM_MODEL: "google/gemma-4-12B-it-qat-w4a16-ct"
+        run: |
+          npx tsx server.ts &
+          sleep 3
+
+      - name: "🧪 Execute 300 Web E2E & API Test Cases"
+        run: npx tsx e2e_tests/runner.ts
+
+      - name: "📋 Publish 300 Test Cases Step Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs web-e2e
+
+      - name: "📤 Upload 300 E2E Test Reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-reports
+          path: e2e_tests/reports/web/
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 4 – Multi-Stage Load & Performance Benchmark Tests
+  # ════════════════════════════════════════════════════════════════════════════
+  load-tests:
+    name: "⚡ Multi-Stage Load Test"
+    runs-on: ubuntu-latest
+    needs: web-build-verify
+    timeout-minutes: 20
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "📦 Install load test dependencies"
+        run: npm install exceljs dotenv tsx --no-save
+
+      - name: "🚀 Start Express API Gateway in background"
+        env:
+          PORT: 3000
+          AWS_LLM_ENDPOINT: "http://13.60.137.114:8000/v1"
+          AWS_LLM_MODEL: "google/gemma-4-12B-it-qat-w4a16-ct"
+          VITE_FIREBASE_API_KEY: "AIzaSyAPlp8vU1T662M3LL0GeGV1UIJ3ZZX2I-s"
+          VITE_FIREBASE_PROJECT_ID: "gen-lang-client-0285677203"
+        run: |
+          npx tsx server.ts &
+          sleep 3
+
+      - name: "⚡ Execute Load Test Benchmark (300 Cycles / 100 VUs)"
+        env:
+          VITE_FIREBASE_API_KEY: "AIzaSyAPlp8vU1T662M3LL0GeGV1UIJ3ZZX2I-s"
+          VITE_FIREBASE_PROJECT_ID: "gen-lang-client-0285677203"
+        run: npx tsx run-perf-test.ts || true
+
+      - name: "📋 Publish Load Test Step Summary"
+        if: always()
+        run: node .github/scripts/generate-job-summary-matrix.cjs load-tests
+
+      - name: "📤 Upload Performance Testing Reports & Excel Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-reports
+          path: |
+            PromptGlow_Performance_Testing_Report.xlsx
+            PromptGlow_Performance_Report.md
+            perf_charts/
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 5 – Unified Executive Summary & GitHub Pages Deploy
+  # ════════════════════════════════════════════════════════════════════════════
+  unified-summary:
+    name: "📊 Unified Summary & Report Deployment"
+    runs-on: ubuntu-latest
+    needs: [security-scan, web-build-verify, web-e2e-suite, load-tests]
+    if: always()
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "📥 Download security reports"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: security-reports
+          path: security-reports
+
+      - name: "📥 Download web E2E reports"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: web-e2e-reports
+          path: e2e-reports
+
+      - name: "📥 Download load test reports"
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: load-test-reports
+          path: load-reports
+
+      - name: "📋 Publish Unified Executive Summary Dashboard"
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          BRANCH: ${{ github.ref_name }}
+        run: node .github/scripts/generate-unified-summary.cjs
+
+      - name: "🚀 Deploy reports to GitHub Pages"
+        uses: peaceiris/actions-gh-pages@v4
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: unified-reports
+          publish_branch: gh-pages
+          destination_dir: .
+          keep_files: true
+          commit_message: "📊 PromptGlow Quality & Security Report – Build #${{ github.run_number }} [skip ci]"

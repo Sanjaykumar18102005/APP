@@ -10,3 +10,6 @@ firebase-applet-config.json
 run-perf-test.ts
 perf_charts/
 PromptGlow_Performance_*
+security-reports/
+unified-reports/
+e2e_tests/reports/
