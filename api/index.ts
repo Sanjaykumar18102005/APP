@@ -36,11 +36,11 @@ app.get('/api', (req, res) => {
 
 // Initialize OpenAI client pointing to AWS vLLM endpoint
 const gemmaClient = new OpenAI({
-  baseURL: process.env.AWS_LLM_ENDPOINT || process.env.GEMMA_API_BASE || 'http://localhost:8000/v1',
-  apiKey: process.env.AWS_LLM_API_KEY || process.env.GEMMA_API_KEY || 'not-needed',
+  baseURL: process.env.AWS_LLM_ENDPOINT || process.env.GEMMA_API_BASE || 'http://13.60.137.114:8000/v1',
+  apiKey: process.env.AWS_LLM_API_KEY || process.env.GEMMA_API_KEY || 'efffa8f665310b30a81fd6ffb70f7dc84b1380e820ce2d438a6fa8df1ac8d6b1',
 });
 
-const MODEL_NAME = process.env.AWS_LLM_MODEL || process.env.GEMMA_MODEL_NAME || 'gemma-4-model';
+const MODEL_NAME = process.env.AWS_LLM_MODEL || process.env.GEMMA_MODEL_NAME || 'google/gemma-4-12B-it-qat-w4a16-ct';
 
 function stripThinking(text: string): string {
   if (!text) return "";
