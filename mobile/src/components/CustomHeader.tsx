@@ -7,7 +7,7 @@ interface CustomHeaderProps {
   subtitle?: string;
 }
 
-export const CustomHeader: React.FC<CustomHeaderProps> = ({ title = "PromptGlow", subtitle }) => {
+export const CustomHeader = ({ title = "PromptGlow", subtitle }: CustomHeaderProps): React.JSX.Element => {
   return (
     <View style={styles.container}>
       <View style={styles.logoRow}>

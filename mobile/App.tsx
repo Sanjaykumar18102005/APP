@@ -14,7 +14,7 @@ import { Home, Sparkles, Camera, Mic, MessageSquare, User } from 'lucide-react-n
 
 const Tab = createBottomTabNavigator();
 
-export default function App() {
+export default function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" backgroundColor="#0b0f19" />

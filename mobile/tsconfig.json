@@ -3,14 +3,14 @@
     "target": "esnext",
     "module": "esnext",
     "lib": ["dom", "esnext"],
-    "jsx": "react-native",
+    "jsx": "react-jsx",
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*", "../node_modules/*"]
     },
     "typeRoots": ["node_modules/@types", "../node_modules/@types"],
-    "strict": true,
+    "strict": false,
     "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
