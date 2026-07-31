@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { TOKENS } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -13,17 +13,24 @@ interface GlassCardProps {
 export const GlassCard: React.FC<GlassCardProps> = ({ 
   children, 
   style, 
-  borderColor = TOKENS.colors.glassBorder,
+  borderColor,
   glow = false,
   pinkGlow = false
 }) => {
+  const { colors } = useTheme();
+
+  const finalBorderColor = borderColor || colors.glassBorder;
+
   return (
     <View 
       style={[
         styles.card, 
-        { borderColor }, 
-        glow && styles.glowStyle,
-        pinkGlow && styles.pinkGlowStyle,
+        { 
+          backgroundColor: colors.glassSurface,
+          borderColor: finalBorderColor 
+        }, 
+        glow && { borderColor: colors.secondaryAccent },
+        pinkGlow && { borderColor: colors.primaryAccent },
         style
       ]}
     >
@@ -34,18 +41,13 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: TOKENS.colors.glassSurface,
     borderWidth: 1,
-    borderRadius: TOKENS.borderRadius.xl,
+    borderRadius: 20,
     padding: 16,
-    ...TOKENS.shadows.glass,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  glowStyle: {
-    borderColor: 'rgba(139, 92, 246, 0.4)',
-    ...TOKENS.shadows.glow,
-  },
-  pinkGlowStyle: {
-    borderColor: 'rgba(255, 0, 122, 0.4)',
-    ...TOKENS.shadows.pinkGlow,
-  }
 });

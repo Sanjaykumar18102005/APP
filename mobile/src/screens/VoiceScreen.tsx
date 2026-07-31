@@ -1,20 +1,40 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView, 
+  TextInput,
+  ActivityIndicator
+} from 'react-native';
 import { GlassCard } from '../components/GlassCard';
-import { TOKENS } from '../theme/tokens';
-import { Mic, MicOff, Sparkles } from 'lucide-react-native';
+import { useTheme } from '../theme/ThemeContext';
+import { Mic, MicOff, Sparkles, XCircle, Volume2 } from 'lucide-react-native';
 
 export const VoiceScreen = ({ navigation }: any) => {
+  const { colors } = useTheme();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isRecordingText, setIsRecordingText] = useState(false);
 
   const toggleListening = () => {
     if (isListening) {
       setIsListening(false);
+      setIsRecordingText(false);
     } else {
       setIsListening(true);
-      setTranscript("Design a responsive dark-mode landing page with floating neon glassmorphic cards and interactive prompt builder.");
+      setIsRecordingText(true);
+      // Simulating live audio stream input if microphone permission granted or manual text
+      if (!transcript) {
+        setTranscript("Creating a high-converting dark neon landing page layout...");
+      }
     }
+  };
+
+  const handleClear = () => {
+    setTranscript('');
+    setIsListening(false);
   };
 
   const handleRefine = () => {
@@ -22,36 +42,63 @@ export const VoiceScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.bgNebula }]} 
+      contentContainerStyle={styles.content}
+    >
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Voice Composer</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.textMain }]}>Voice Composer</Text>
+        <Text style={[styles.subtitle, { color: colors.textSoft }]}>
           Speak your raw idea aloud. We'll capture it and refine it into a perfect prompt.
         </Text>
       </View>
 
-      {/* Mic Button Circle */}
+      {/* Mic Button Circle with Pulsing Effect */}
       <View style={styles.micWrapper}>
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.micCircle, isListening && styles.micCircleActive]}
+          style={[
+            styles.micCircle,
+            { 
+              backgroundColor: isListening ? 'rgba(34, 197, 94, 0.15)' : colors.glassSurface,
+              borderColor: isListening ? '#22c55e' : colors.glassBorder 
+            }
+          ]}
           onPress={toggleListening}
         >
           {isListening ? (
             <Mic color="#22c55e" size={48} />
           ) : (
-            <MicOff color={TOKENS.colors.textSoft} size={48} />
+            <MicOff color={colors.textSoft} size={48} />
           )}
         </TouchableOpacity>
+
+        {isListening && (
+          <View style={styles.recordingStatusRow}>
+            <View style={styles.redPulseDot} />
+            <Text style={styles.recordingText}>Listening to live voice input...</Text>
+          </View>
+        )}
       </View>
 
-      {/* Transcript Panel */}
+      {/* Live Speech & Editable Transcript Panel */}
       <GlassCard style={styles.transcriptCard}>
-        <Text style={styles.transcriptLabel}>Live Speech Transcript</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={[styles.transcriptLabel, { color: colors.textSoft }]}>
+            LIVE SPEECH & USER INPUT
+          </Text>
+          {transcript.length > 0 && (
+            <TouchableOpacity onPress={handleClear}>
+              <XCircle color={colors.textSoft} size={18} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <TextInput
-          style={styles.transcriptInput}
-          placeholder={isListening ? "Listening..." : "Tap the microphone to start speaking..."}
-          placeholderTextColor="rgba(255, 255, 255, 0.3)"
+          style={[styles.transcriptInput, { color: colors.textMain }]}
+          placeholder={isListening ? "Listening to your voice..." : "Tap microphone or type your voice prompt here..."}
+          placeholderTextColor={colors.textMuted}
           value={transcript}
           onChangeText={setTranscript}
           multiline
@@ -60,7 +107,10 @@ export const VoiceScreen = ({ navigation }: any) => {
 
       {/* Refine Button */}
       {transcript.trim() ? (
-        <TouchableOpacity style={styles.refineBtn} onPress={handleRefine}>
+        <TouchableOpacity 
+          style={[styles.refineBtn, { backgroundColor: colors.primaryAccent }]} 
+          onPress={handleRefine}
+        >
           <Text style={styles.refineBtnText}>Refine This Prompt</Text>
           <Sparkles color="#FFFFFF" size={18} />
         </TouchableOpacity>
@@ -74,7 +124,6 @@ export const VoiceScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TOKENS.colors.bgNebula,
   },
   content: {
     paddingHorizontal: 20,
@@ -83,41 +132,46 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: TOKENS.colors.textMain,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: TOKENS.colors.textSoft,
     textAlign: 'center',
     lineHeight: 20,
   },
   micWrapper: {
-    marginBottom: 32,
+    alignItems: 'center',
+    marginBottom: 28,
   },
   micCircle: {
     width: 120,
     height: 120,
-    borderRadius: TOKENS.borderRadius.full,
-    backgroundColor: TOKENS.colors.glassSurface,
+    borderRadius: 60,
     borderWidth: 2,
-    borderColor: TOKENS.colors.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micCircleActive: {
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    borderColor: '#22c55e',
-    shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    elevation: 10,
+  recordingStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  redPulseDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ef4444',
+  },
+  recordingText: {
+    fontSize: 12,
+    color: '#22c55e',
+    fontWeight: '600',
   },
   transcriptCard: {
     width: '100%',
@@ -125,16 +179,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     minHeight: 160,
   },
-  transcriptLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TOKENS.colors.textSoft,
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
-    textTransform: 'uppercase',
+  },
+  transcriptLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 1,
   },
   transcriptInput: {
-    color: TOKENS.colors.textMain,
     fontSize: 15,
     lineHeight: 22,
     textAlignVertical: 'top',
@@ -142,14 +198,12 @@ const styles = StyleSheet.create({
   },
   refineBtn: {
     width: '100%',
-    backgroundColor: TOKENS.colors.primaryAccent,
-    borderRadius: TOKENS.borderRadius.md,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    ...TOKENS.shadows.pinkGlow,
   },
   refineBtnText: {
     color: '#FFFFFF',

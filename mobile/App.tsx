@@ -11,14 +11,17 @@ import { VoiceScreen } from './src/screens/VoiceScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { Home, Sparkles, Camera, Mic, MessageSquare, User } from 'lucide-react-native';
-import { TOKENS } from './src/theme/tokens';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { AuthProvider } from './src/lib/auth-context';
 
 const Tab = createBottomTabNavigator();
 
-export default function App(): React.JSX.Element {
+function MainNavigator() {
+  const { colors, theme } = useTheme();
+
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor={TOKENS.colors.bgNebula} />
+      <StatusBar style={theme === 'light' ? 'dark' : 'light'} backgroundColor={colors.bgNebula} />
       <NavigationContainer>
         {/* @ts-ignore */}
         <Tab.Navigator
@@ -26,14 +29,14 @@ export default function App(): React.JSX.Element {
             // @ts-ignore
             header: () => <CustomHeader />,
             tabBarStyle: {
-              backgroundColor: TOKENS.colors.bgNebula,
-              borderTopColor: TOKENS.colors.glassBorder,
+              backgroundColor: colors.bgNebula,
+              borderTopColor: colors.glassBorder,
               height: 64,
               paddingBottom: 10,
               paddingTop: 8,
             },
-            tabBarActiveTintColor: TOKENS.colors.primaryAccent,
-            tabBarInactiveTintColor: TOKENS.colors.textSoft,
+            tabBarActiveTintColor: colors.primaryAccent,
+            tabBarInactiveTintColor: colors.textSoft,
             tabBarLabelStyle: {
               fontSize: 10,
               fontWeight: '600',
@@ -86,5 +89,15 @@ export default function App(): React.JSX.Element {
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
+  );
+}
+
+export default function App(): React.JSX.Element {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <MainNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
