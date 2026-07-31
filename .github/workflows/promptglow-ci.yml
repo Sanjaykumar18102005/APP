@@ -87,6 +87,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
+      - name: "📦 Install report dependencies"
+        if: always()
+        run: npm install exceljs --no-save --no-audit --ignore-scripts
+
       - name: "📊 Generate Security Excel & Markdown Reports"
         if: always()
         run: node .github/scripts/generate-security-reports.cjs
