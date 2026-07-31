@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 firebase-applet-config.json
+run-perf-test.ts
+perf_charts/
+PromptGlow_Performance_*
