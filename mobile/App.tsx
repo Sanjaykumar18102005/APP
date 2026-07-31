@@ -11,26 +11,29 @@ import { VoiceScreen } from './src/screens/VoiceScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { Home, Sparkles, Camera, Mic, MessageSquare, User } from 'lucide-react-native';
+import { TOKENS } from './src/theme/tokens';
 
 const Tab = createBottomTabNavigator();
 
 export default function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor="#0b0f19" />
+      <StatusBar style="light" backgroundColor={TOKENS.colors.bgNebula} />
       <NavigationContainer>
+        {/* @ts-ignore */}
         <Tab.Navigator
           screenOptions={{
+            // @ts-ignore
             header: () => <CustomHeader />,
             tabBarStyle: {
-              backgroundColor: '#0b0f19',
-              borderTopColor: 'rgba(255, 255, 255, 0.08)',
-              height: 60,
-              paddingBottom: 8,
-              paddingTop: 6,
+              backgroundColor: TOKENS.colors.bgNebula,
+              borderTopColor: TOKENS.colors.glassBorder,
+              height: 64,
+              paddingBottom: 10,
+              paddingTop: 8,
             },
-            tabBarActiveTintColor: '#ec4899',
-            tabBarInactiveTintColor: '#6b7280',
+            tabBarActiveTintColor: TOKENS.colors.primaryAccent,
+            tabBarInactiveTintColor: TOKENS.colors.textSoft,
             tabBarLabelStyle: {
               fontSize: 10,
               fontWeight: '600',

@@ -1,118 +1,126 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView, 
+  ActivityIndicator, 
+  KeyboardAvoidingView, 
+  Platform 
+} from 'react-native';
 import { GlassCard } from '../components/GlassCard';
-import { MarkdownView } from '../components/MarkdownView';
+import { TOKENS } from '../theme/tokens';
 import { getApiUrl } from '../config/api';
-import { Send, Bot, User } from 'lucide-react-native';
-import { incrementUserStat, saveChatMessageToFirestore } from '../lib/user-service';
+import { Sparkles, User, Send } from 'lucide-react-native';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
+type Message = {
+  role: 'user' | 'model';
   content: string;
-}
+};
 
 export const ChatScreen = () => {
+  const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Hello! I am your AI assistant in PromptGlow. You can chat with me normally here, brainstorm ideas, or ask for coding help!'
+    { 
+      role: 'model', 
+      content: "Hello! I am your AI assistant in PromptGlow. You can chat with me normally here, brainstorm ideas, or ask for coding help!" 
     }
   ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const handleSend = async () => {
+    if (!input.trim()) return;
 
-    const userMsgText = input.trim();
-    const userMsg: Message = {
-      id: String(Date.now()),
-      role: 'user',
-      content: userMsgText
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    const userMsg = input.trim();
     setInput('');
-    setLoading(true);
+    setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setIsTyping(true);
 
     try {
-      const res = await fetch(getApiUrl('/api/chat'), {
+      const response = await fetch(getApiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+          messages: [
+            ...messages,
+            { role: 'user', content: userMsg }
+          ]
         })
       });
-
-      const data = await res.json();
-      const aiReplyText = data.text || data.response || "No response received.";
-
-      const aiMsg: Message = {
-        id: String(Date.now() + 1),
-        role: 'assistant',
-        content: aiReplyText
-      };
-
-      const finalMessages = [...newMessages, aiMsg];
-      setMessages(finalMessages);
-
-      // Increment Firestore stats
-      incrementUserStat('sandbox_guest_user', 'totalChats').catch(console.warn);
-      saveChatMessageToFirestore({ uid: 'sandbox_guest_user' }, finalMessages).catch(console.warn);
+      const data = await response.json();
+      setMessages((prev) => [...prev, { role: 'model', content: data.text || "No response received." }]);
     } catch (err: any) {
-      console.warn("Chat API error:", err);
-      const fallbackMsg: Message = {
-        id: String(Date.now() + 1),
-        role: 'assistant',
-        content: `### Welcome to PromptGlow Workspace Copilot! 🧠\nI am currently running in **Sandbox Fallback Mode**.\n\nWe can still collaborate on prompt blueprints and system templates!`
-      };
-      setMessages([...newMessages, fallbackMsg]);
+      setMessages((prev) => [...prev, { role: 'model', content: `AI Error: ${err.message || 'Unknown server error.'}` }]);
     } finally {
-      setLoading(false);
+      setIsTyping(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={80}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.iconCircle}>
+          <Sparkles color="#3b82f6" size={20} />
+        </View>
+        <Text style={styles.title}>Workspace Chat</Text>
+      </View>
+
+      {/* Messages Scroll Area */}
+      <ScrollView 
         ref={scrollViewRef}
-        style={styles.chatArea}
-        contentContainerStyle={styles.chatContent}
+        style={styles.messagesContainer}
+        contentContainerStyle={styles.messagesContent}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
-        {messages.map((msg) => (
-          <View
-            key={msg.id}
+        {messages.map((msg, i) => (
+          <View 
+            key={i} 
             style={[
-              styles.messageRow,
-              msg.role === 'user' ? styles.userRow : styles.assistantRow
+              styles.msgRow, 
+              msg.role === 'user' ? styles.userRow : styles.modelRow
             ]}
           >
-            <View style={[styles.avatar, msg.role === 'user' ? styles.userAvatar : styles.assistantAvatar]}>
-              {msg.role === 'user' ? <User color="#ffffff" size={14} /> : <Bot color="#ec4899" size={14} />}
-            </View>
-
-            <GlassCard
-              style={msg.role === 'user' ? { ...styles.bubble, ...styles.userBubble } : { ...styles.bubble, ...styles.assistantBubble }}
-              borderColor={msg.role === 'user' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(236, 72, 153, 0.3)'}
+            <View 
+              style={[
+                styles.avatarCircle, 
+                msg.role === 'user' ? styles.userAvatar : styles.modelAvatar
+              ]}
             >
               {msg.role === 'user' ? (
-                <Text style={styles.userMsgText}>{msg.content}</Text>
+                <User color={TOKENS.colors.textSoft} size={16} />
               ) : (
-                <MarkdownView content={msg.content} />
+                <Sparkles color={TOKENS.colors.primaryAccent} size={16} />
               )}
+            </View>
+
+            <GlassCard 
+              style={[
+                styles.msgBubble, 
+                msg.role === 'user' ? styles.userBubble : styles.modelBubble
+              ]}
+              pinkGlow={msg.role === 'model'}
+            >
+              <Text style={styles.msgText}>{msg.content}</Text>
             </GlassCard>
           </View>
         ))}
 
-        {loading && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color="#ec4899" size="small" />
-            <Text style={styles.loadingText}>Gemma 4 GPU thinking...</Text>
+        {isTyping && (
+          <View style={[styles.msgRow, styles.modelRow]}>
+            <View style={[styles.avatarCircle, styles.modelAvatar]}>
+              <Sparkles color={TOKENS.colors.primaryAccent} size={16} />
+            </View>
+            <GlassCard style={[styles.msgBubble, styles.modelBubble]}>
+              <ActivityIndicator color={TOKENS.colors.primaryAccent} size="small" />
+            </GlassCard>
           </View>
         )}
       </ScrollView>
@@ -120,111 +128,135 @@ export const ChatScreen = () => {
       {/* Input Bar */}
       <View style={styles.inputContainer}>
         <TextInput
-          style={styles.textInput}
+          style={styles.input}
           placeholder="Ask me anything..."
-          placeholderTextColor="#6b7280"
+          placeholderTextColor="rgba(255, 255, 255, 0.3)"
           value={input}
           onChangeText={setInput}
-          onSubmitEditing={handleSendMessage}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} disabled={loading}>
-          <Send color="#ffffff" size={18} />
+        <TouchableOpacity 
+          style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]} 
+          onPress={handleSend}
+          disabled={!input.trim()}
+        >
+          <Send color="#FFFFFF" size={18} />
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: TOKENS.colors.bgNebula,
   },
-  chatArea: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: TOKENS.colors.glassBorder,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: TOKENS.colors.textMain,
+  },
+  messagesContainer: {
     flex: 1,
   },
-  chatContent: {
-    padding: 16,
-    gap: 12,
+  messagesContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 16,
   },
-  messageRow: {
+  msgRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    gap: 12,
+    maxWidth: '88%',
   },
   userRow: {
+    alignSelf: 'flex-end',
     flexDirection: 'row-reverse',
   },
-  assistantRow: {
-    flexDirection: 'row',
+  modelRow: {
+    alignSelf: 'flex-start',
   },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  avatarCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: TOKENS.borderRadius.full,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   userAvatar: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: TOKENS.colors.bgSurface,
+    borderColor: TOKENS.colors.glassBorder,
   },
-  assistantAvatar: {
-    backgroundColor: 'rgba(236, 72, 153, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(236, 72, 153, 0.4)',
+  modelAvatar: {
+    backgroundColor: 'rgba(255, 0, 122, 0.15)',
+    borderColor: 'rgba(255, 0, 122, 0.3)',
   },
-  bubble: {
-    maxWidth: '82%',
-    padding: 12,
+  msgBubble: {
+    flex: 1,
+    padding: 14,
   },
   userBubble: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: TOKENS.colors.bgSurface,
   },
-  assistantBubble: {
-    backgroundColor: 'rgba(23, 27, 44, 0.85)',
+  modelBubble: {
+    backgroundColor: TOKENS.colors.glassSurface,
   },
-  userMsgText: {
-    fontSize: 13,
-    color: '#ffffff',
-    lineHeight: 18,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 36,
-  },
-  loadingText: {
-    fontSize: 12,
-    color: '#9ca3af',
+  msgText: {
+    fontSize: 14,
+    color: TOKENS.colors.textMain,
+    lineHeight: 22,
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#111827',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: TOKENS.colors.bgSurface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    gap: 8,
+    borderTopColor: TOKENS.colors.glassBorder,
   },
-  textInput: {
+  input: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#ffffff',
-    fontSize: 13,
+    height: 48,
+    backgroundColor: TOKENS.colors.inputBg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: TOKENS.colors.glassBorder,
+    borderRadius: TOKENS.borderRadius.md,
+    paddingHorizontal: 16,
+    color: TOKENS.colors.textMain,
+    fontSize: 14,
   },
-  sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#ec4899',
-    justifyContent: 'center',
+  sendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: TOKENS.colors.primaryAccent,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...TOKENS.shadows.pinkGlow,
+  },
+  sendBtnDisabled: {
+    opacity: 0.4,
   },
 });

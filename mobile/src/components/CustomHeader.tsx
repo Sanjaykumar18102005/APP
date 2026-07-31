@@ -1,59 +1,57 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Sparkles } from 'lucide-react-native';
+import { TOKENS } from '../theme/tokens';
 
-interface CustomHeaderProps {
-  title?: string;
-  subtitle?: string;
-}
-
-export const CustomHeader = ({ title = "PromptGlow", subtitle }: CustomHeaderProps): React.JSX.Element => {
+export const CustomHeader: React.FC = () => {
   return (
-    <View style={styles.container}>
-      <View style={styles.logoRow}>
-        <View style={styles.iconContainer}>
-          <Sparkles color="#ec4899" size={22} />
-        </View>
-        <Text style={styles.titleText}>{title}</Text>
+    <View style={styles.header}>
+      <View style={styles.logoContainer}>
+        <Sparkles color={TOKENS.colors.primaryAccent} size={26} />
+        <Text style={styles.title}>PromptGlow</Text>
       </View>
-      {subtitle ? <Text style={styles.subtitleText}>{subtitle}</Text> : null}
+      <View style={styles.badgeContainer}>
+        <Text style={styles.badgeText}>AI PRO</Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: '#0b0f19',
+  header: {
+    backgroundColor: TOKENS.colors.bgNebula,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  logoRow: {
+    borderBottomColor: TOKENS.colors.glassBorder,
+    paddingHorizontal: 20,
+    paddingTop: 48,
+    paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(236, 72, 153, 0.15)',
-    justifyContent: 'center',
+  logoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(236, 72, 153, 0.3)',
+    gap: 10,
   },
-  titleText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: TOKENS.colors.textMain,
     letterSpacing: 0.5,
   },
-  subtitleText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 4,
+  badgeContainer: {
+    backgroundColor: 'rgba(255, 0, 122, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 122, 0.3)',
+    borderRadius: TOKENS.borderRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
+  badgeText: {
+    color: TOKENS.colors.primaryAccent,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  }
 });

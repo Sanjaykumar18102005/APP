@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Image as RNImage, 
+  TouchableOpacity, 
+  ScrollView, 
+  ActivityIndicator, 
+  Linking 
+} from 'react-native';
 import { GlassCard } from '../components/GlassCard';
-import { MarkdownView } from '../components/MarkdownView';
+import { TOKENS } from '../theme/tokens';
 import { getApiUrl } from '../config/api';
-import { Camera, Image as ImageIcon, Sparkles, Check, Copy } from 'lucide-react-native';
+import { 
+  Camera, 
+  Image as ImageIcon, 
+  Sparkles, 
+  ExternalLink, 
+  Copy, 
+  CheckCircle2, 
+  Ratio 
+} from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
-import { incrementUserStat } from '../lib/user-service';
 
 export const VisionScreen = () => {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState('16:9');
   const [resultText, setResultText] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const pickImage = async (useCamera = false) => {
@@ -21,10 +37,7 @@ export const VisionScreen = () => {
       let result;
       if (useCamera) {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) {
-          Alert.alert("Permission Required", "Camera permission is needed to take photos.");
-          return;
-        }
+        if (!perm.granted) return;
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           quality: 0.7,
@@ -32,10 +45,7 @@ export const VisionScreen = () => {
         });
       } else {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) {
-          Alert.alert("Permission Required", "Photo library permission is needed to select images.");
-          return;
-        }
+        if (!perm.granted) return;
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
           quality: 0.7,
@@ -54,12 +64,8 @@ export const VisionScreen = () => {
   };
 
   const handleAnalyzeImage = async () => {
-    if (!imageBase64 && !imageUri) {
-      Alert.alert("Image Required", "Please select or take an image to analyze.");
-      return;
-    }
-
-    setLoading(true);
+    if (!imageBase64 && !imageUri) return;
+    setIsAnalyzing(true);
     setResultText('');
 
     const payloadBase64 = imageBase64 || "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -74,53 +80,59 @@ export const VisionScreen = () => {
         })
       });
       const data = await res.json();
-      const output = data.text || data.masterPrompt || "Image prompt generated.";
-      setResultText(output);
-
-      incrementUserStat('sandbox_guest_user', 'totalVisionAnalyzed').catch(console.warn);
+      setResultText(data.text || data.masterPrompt || "Image prompt generated.");
     } catch (err: any) {
-      console.warn("Vision API error:", err);
-      setResultText(`# 📷 Image Dissection & Universal Prompt Generation\n\n#### 🎨 Visual Composition & Style\n- **Medium:** High-fidelity UI wireframe & glassmorphic layout.\n- **Lighting:** Dark theme with neon magenta and deep purple accents.\n\n##### 1. Master Universal Prompt\n\`\`\`text\nA premium dark digital UI dashboard with glowing neon accents --ar ${aspectRatio}\n\`\`\``);
+      setResultText(
+        `# 📷 Image Dissection & Universal Prompt Generation\n\n#### 🎨 Visual Composition & Style\n- **Medium:** High-fidelity UI wireframe & glassmorphic layout.\n- **Lighting:** Dark theme with neon magenta and deep purple accents.\n\n##### 1. Master Universal Prompt\n\`\`\`text\nA premium dark digital UI dashboard with glowing neon accents --ar ${aspectRatio}\n\`\`\``
+      );
     } finally {
-      setLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
-  const handleCopyPrompt = async () => {
+  const handleCopy = async () => {
+    if (!resultText) return;
     await Clipboard.setStringAsync(resultText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const openUrl = (url: string) => {
+    Linking.openURL(url).catch(console.warn);
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Vision Reverse Engineering</Text>
-      <Text style={styles.subtitle}>Extract prompts, visual DNA, and aspect ratios from images.</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.titleRow}>
+          <Camera color={TOKENS.colors.secondaryAccent} size={28} />
+          <Text style={styles.title}>Vision Reverse Engineering</Text>
+        </View>
+        <Text style={styles.subtitle}>
+          Upload an image. We'll extract its DNA, aspect ratio, and give you the prompt to recreate it.
+        </Text>
+      </View>
 
-      {/* Image Picker Area */}
-      <GlassCard style={styles.card}>
+      {/* Upload Drop Zone */}
+      <GlassCard style={styles.uploadCard} glow>
         {imageUri ? (
-          <View style={styles.previewBox}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-            <TouchableOpacity style={styles.changeBadge} onPress={() => setImageUri(null)}>
-              <Text style={styles.changeBadgeText}>Change Image</Text>
+          <View style={styles.previewContainer}>
+            <RNImage source={{ uri: imageUri }} style={styles.previewImage} />
+            <View style={styles.ratioBadge}>
+              <Ratio color={TOKENS.colors.secondaryAccent} size={14} />
+              <Text style={styles.ratioBadgeText}>Ratio: {aspectRatio}</Text>
+            </View>
+            <TouchableOpacity style={styles.changeBtn} onPress={() => pickImage(false)}>
+              <Text style={styles.changeBtnText}>Change Image</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.uploadPlaceholder}>
-            <Camera color="#a855f7" size={40} />
-            <Text style={styles.uploadText}>Select or Capture Reference Image</Text>
-            <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.pickerBtn} onPress={() => pickImage(false)}>
-                <ImageIcon color="#ffffff" size={16} />
-                <Text style={styles.pickerBtnText}>Gallery</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.pickerBtn} onPress={() => pickImage(true)}>
-                <Camera color="#ffffff" size={16} />
-                <Text style={styles.pickerBtnText}>Camera</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.dropZone} onPress={() => pickImage(false)}>
+            <ImageIcon color={TOKENS.colors.textSoft} size={40} style={{ marginBottom: 12 }} />
+            <Text style={styles.dropTitle}>Click to upload or select photo</Text>
+            <Text style={styles.dropSub}>PNG, JPG, GIF or WEBP</Text>
+          </TouchableOpacity>
         )}
 
         {/* Aspect Ratio Selector */}
@@ -132,37 +144,70 @@ export const VisionScreen = () => {
               style={[styles.ratioPill, aspectRatio === r && styles.ratioPillActive]}
               onPress={() => setAspectRatio(r)}
             >
-              <Text style={[styles.ratioText, aspectRatio === r && styles.ratioTextActive]}>{r}</Text>
+              <Text style={[styles.ratioPillText, aspectRatio === r && styles.ratioPillTextActive]}>{r}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.analyzeBtn} onPress={handleAnalyzeImage} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
+        <TouchableOpacity 
+          style={[styles.analyzeBtn, (!imageUri || isAnalyzing) && styles.disabledBtn]} 
+          onPress={handleAnalyzeImage} 
+          disabled={!imageUri || isAnalyzing}
+        >
+          {isAnalyzing ? (
+            <View style={styles.spinRow}>
+              <ActivityIndicator color="#FFFFFF" size="small" />
+              <Text style={styles.analyzeBtnText}>Extracting DNA...</Text>
+            </View>
           ) : (
-            <>
-              <Sparkles color="#ffffff" size={18} />
-              <Text style={styles.analyzeBtnText}>Analyze Image & Extract Prompt</Text>
-            </>
+            <View style={styles.spinRow}>
+              <Text style={styles.analyzeBtnText}>Analyze Image</Text>
+              <Sparkles color="#FFFFFF" size={18} />
+            </View>
           )}
         </TouchableOpacity>
       </GlassCard>
 
-      {/* Result Card */}
+      {/* Analysis Output Panel */}
       {resultText ? (
-        <GlassCard style={styles.card} borderColor="rgba(168, 85, 247, 0.4)">
-          <View style={styles.resultHeader}>
-            <Text style={styles.resultTitle}>Extracted Prompt DNA</Text>
-            <TouchableOpacity style={styles.copyBtn} onPress={handleCopyPrompt}>
-              {copied ? <Check color="#10b981" size={14} /> : <Copy color="#ffffff" size={14} />}
-              <Text style={styles.copyBtnText}>{copied ? "Copied!" : "Copy"}</Text>
+        <GlassCard style={styles.resultCard}>
+          <Text style={styles.resultHeaderTitle}>Analysis Output</Text>
+          <View style={styles.markdownBox}>
+            <Text style={styles.markdownContent}>{resultText}</Text>
+          </View>
+
+          {/* External Links & Copy */}
+          <Text style={styles.openWithLabel}>Open with:</Text>
+          <View style={styles.linkRow}>
+            <TouchableOpacity 
+              style={styles.linkChip}
+              onPress={() => openUrl(`https://chatgpt.com/?q=${encodeURIComponent(resultText)}`)}
+            >
+              <ExternalLink color={TOKENS.colors.textSoft} size={14} />
+              <Text style={styles.linkChipText}>ChatGPT</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.linkChip}
+              onPress={() => openUrl(`https://claude.ai/new?q=${encodeURIComponent(resultText)}`)}
+            >
+              <ExternalLink color={TOKENS.colors.textSoft} size={14} />
+              <Text style={styles.linkChipText}>Claude</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.linkChip}
+              onPress={() => { handleCopy(); openUrl("https://gemini.google.com/app"); }}
+            >
+              <ExternalLink color={TOKENS.colors.textSoft} size={14} />
+              <Text style={styles.linkChipText}>Gemini</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.markdownBox}>
-            <MarkdownView content={resultText} />
-          </View>
+          <TouchableOpacity style={styles.copyPromptBtn} onPress={handleCopy}>
+            {copied ? <CheckCircle2 color="#4ade80" size={16} /> : <Copy color={TOKENS.colors.textMain} size={16} />}
+            <Text style={styles.copyPromptBtnText}>{copied ? "Copied" : "Copy Prompt"}</Text>
+          </TouchableOpacity>
         </GlassCard>
       ) : null}
 
@@ -174,160 +219,212 @@ export const VisionScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: TOKENS.colors.bgNebula,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: '800',
+    color: TOKENS.colors.textMain,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#9ca3af',
-    marginBottom: 16,
+    fontSize: 14,
+    color: TOKENS.colors.textSoft,
+    lineHeight: 20,
   },
-  card: {
-    marginBottom: 16,
+  uploadCard: {
+    padding: 18,
+    marginBottom: 20,
   },
-  previewBox: {
-    position: 'relative',
+  dropZone: {
+    height: 160,
+    borderWidth: 2,
+    borderColor: TOKENS.colors.glassBorder,
+    borderStyle: 'dashed',
+    borderRadius: TOKENS.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  dropTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TOKENS.colors.textSoft,
+    marginBottom: 4,
+  },
+  dropSub: {
+    fontSize: 12,
+    color: TOKENS.colors.textMuted,
+  },
+  previewContainer: {
     height: 200,
-    borderRadius: 12,
+    borderRadius: TOKENS.borderRadius.lg,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 20,
+    position: 'relative',
   },
-  imagePreview: {
+  previewImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  changeBadge: {
+  ratioBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: TOKENS.borderRadius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  ratioBadgeText: {
+    fontSize: 12,
+    color: TOKENS.colors.secondaryAccent,
+    fontWeight: '700',
+  },
+  changeBtn: {
     position: 'absolute',
     bottom: 10,
     right: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
-  changeBadgeText: {
-    fontSize: 11,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  uploadPlaceholder: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    borderStyle: 'dashed',
-    marginBottom: 16,
-  },
-  uploadText: {
-    fontSize: 13,
-    color: '#9ca3af',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  pickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(168, 85, 247, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
-  },
-  pickerBtnText: {
+  changeBtnText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginLeft: 6,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   ratioLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#e5e7eb',
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: TOKENS.colors.textSoft,
+    marginBottom: 10,
   },
   ratioRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   ratioPill: {
     flex: 1,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 8,
     alignItems: 'center',
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: TOKENS.colors.inputBg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: TOKENS.colors.glassBorder,
   },
   ratioPillActive: {
-    backgroundColor: 'rgba(168, 85, 247, 0.3)',
-    borderColor: '#a855f7',
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+    borderColor: TOKENS.colors.secondaryAccent,
   },
-  ratioText: {
-    fontSize: 12,
-    color: '#9ca3af',
+  ratioPillText: {
+    fontSize: 13,
+    color: TOKENS.colors.textSoft,
   },
-  ratioTextActive: {
-    color: '#ffffff',
-    fontWeight: 'bold',
+  ratioPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   analyzeBtn: {
-    backgroundColor: '#a855f7',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: TOKENS.colors.secondaryAccent,
+    borderRadius: TOKENS.borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...TOKENS.shadows.glow,
+  },
+  disabledBtn: {
+    opacity: 0.5,
+  },
+  spinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  analyzeBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  resultCard: {
+    padding: 18,
+  },
+  resultHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TOKENS.colors.secondaryAccent,
+    marginBottom: 12,
+  },
+  markdownBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    padding: 14,
+    borderRadius: TOKENS.borderRadius.md,
+    marginBottom: 16,
+  },
+  markdownContent: {
+    fontFamily: 'monospace',
+    fontSize: 13,
+    color: TOKENS.colors.textMain,
+    lineHeight: 20,
+  },
+  openWithLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: TOKENS.colors.textSoft,
+    marginBottom: 10,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+  },
+  linkChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: TOKENS.colors.glassSurface,
+    borderWidth: 1,
+    borderColor: TOKENS.colors.glassBorder,
+  },
+  linkChipText: {
+    fontSize: 13,
+    color: TOKENS.colors.textMain,
+  },
+  copyPromptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: TOKENS.borderRadius.md,
+    backgroundColor: TOKENS.colors.glassSurface,
+    borderWidth: 1,
+    borderColor: TOKENS.colors.glassBorder,
   },
-  analyzeBtnText: {
-    color: '#ffffff',
+  copyPromptBtnText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  resultTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#a855f7',
-  },
-  copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(168, 85, 247, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  copyBtnText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginLeft: 4,
-  },
-  markdownBox: {
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    padding: 12,
-    borderRadius: 12,
+    fontWeight: '600',
+    color: TOKENS.colors.textMain,
   },
 });

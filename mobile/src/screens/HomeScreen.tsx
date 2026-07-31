@@ -1,97 +1,101 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
-import { Sparkles, Camera, Mic, MessageSquare, ArrowRight } from 'lucide-react-native';
+import { Sparkles, Image, Mic, MessageSquare, ArrowRight } from 'lucide-react-native';
+import { TOKENS } from '../theme/tokens';
 
 export const HomeScreen = ({ navigation }: any) => {
-  const [idea, setIdea] = useState('');
-
-  const handleStartPrompting = () => {
-    if (!idea.trim()) return;
-    navigation.navigate('Glow', { initialIdea: idea });
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Hero Banner */}
-      <GlassCard borderColor="rgba(236, 72, 153, 0.4)" style={styles.heroCard}>
-        <View style={styles.badgeRow}>
-          <Sparkles size={14} color="#ec4899" />
-          <Text style={styles.badgeText}>AI PROMPT ARCHITECT</Text>
-        </View>
-        <Text style={styles.heroTitle}>Master Prompt Engineering with AI</Text>
-        <Text style={styles.heroSub}>
-          Transform raw ideas into high-fidelity AI prompts. Powered by your AWS Gemma 4 GPU model.
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>PromptGlow</Text>
+        <Text style={styles.subtitle}>
+          Your AI command center.{'\n'}
+          Transform abstract ideas into perfect prompts.
         </Text>
-      </GlassCard>
+      </View>
 
-      {/* Quick Input Launcher */}
-      <GlassCard style={styles.inputCard}>
-        <Text style={styles.inputLabel}>What do you want to create or ask?</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="e.g. Design a landing page for an organic food startup..."
-          placeholderTextColor="#6b7280"
-          value={idea}
-          onChangeText={setIdea}
-          multiline
-        />
-        <TouchableOpacity style={styles.glowButton} onPress={handleStartPrompting}>
-          <Text style={styles.glowButtonText}>Build Prompt with Glow</Text>
-          <ArrowRight color="#ffffff" size={18} />
+      {/* Grid of 4 Feature Cards */}
+      <View style={styles.grid}>
+        {/* Card 1: Refine Prompt */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Glow')}
+        >
+          <GlassCard style={styles.mainCard} pinkGlow>
+            <View style={[styles.iconCircle, styles.pinkCircle]}>
+              <Sparkles color={TOKENS.colors.primaryAccent} size={24} />
+            </View>
+            <Text style={styles.cardTitle}>Refine Prompt</Text>
+            <Text style={styles.cardDesc}>
+              Start with a vague idea and let our AI guide you through an adaptive branching process to create a world-class prompt.
+            </Text>
+            <View style={styles.actionRow}>
+              <Text style={[styles.actionText, { color: TOKENS.colors.primaryAccent }]}>Start Building</Text>
+              <ArrowRight color={TOKENS.colors.primaryAccent} size={16} style={{ marginLeft: 6 }} />
+            </View>
+          </GlassCard>
         </TouchableOpacity>
-      </GlassCard>
 
-      {/* Feature Grid */}
-      <Text style={styles.sectionHeader}>Explore Features</Text>
+        {/* Card 2: Reverse Engineer Image */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Vision')}
+        >
+          <GlassCard style={styles.mainCard} glow>
+            <View style={[styles.iconCircle, styles.purpleCircle]}>
+              <Image color={TOKENS.colors.secondaryAccent} size={24} />
+            </View>
+            <Text style={styles.cardTitle}>Reverse Engineer Image</Text>
+            <Text style={styles.cardDesc}>
+              Upload an image and we'll analyze it using Gemini Vision to generate the exact Midjourney or Stable Diffusion prompt.
+            </Text>
+            <View style={styles.actionRow}>
+              <Text style={[styles.actionText, { color: TOKENS.colors.secondaryAccent }]}>Try Vision</Text>
+              <ArrowRight color={TOKENS.colors.secondaryAccent} size={16} style={{ marginLeft: 6 }} />
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('Glow')}>
-        <GlassCard style={styles.featureCard} borderColor="rgba(236, 72, 153, 0.25)">
-          <View style={[styles.featureIconBox, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
-            <Sparkles color="#ec4899" size={24} />
-          </View>
-          <View style={styles.featureInfo}>
-            <Text style={styles.featureTitle}>Prompt Builder (Glow)</Text>
-            <Text style={styles.featureSub}>3-step dynamic question wizard to synthesize expert prompts.</Text>
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
+        {/* Card 3: Voice Prompting */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Voice')}
+        >
+          <GlassCard style={styles.smallCard}>
+            <View style={styles.smallRow}>
+              <View style={[styles.smallIconCircle, styles.greenCircle]}>
+                <Mic color="#22c55e" size={20} />
+              </View>
+              <View style={styles.smallTextContainer}>
+                <Text style={styles.smallTitle}>Voice Prompting</Text>
+                <Text style={styles.smallDesc}>Draft prompts by talking aloud</Text>
+              </View>
+              <ArrowRight color={TOKENS.colors.textSoft} size={18} />
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('Vision')}>
-        <GlassCard style={styles.featureCard} borderColor="rgba(168, 85, 247, 0.25)">
-          <View style={[styles.featureIconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
-            <Camera color="#a855f7" size={24} />
-          </View>
-          <View style={styles.featureInfo}>
-            <Text style={styles.featureTitle}>Vision Reverse Engineering</Text>
-            <Text style={styles.featureSub}>Upload UI references to extract universal Midjourney/DALL-E prompts.</Text>
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
-        <GlassCard style={styles.featureCard} borderColor="rgba(59, 130, 246, 0.25)">
-          <View style={[styles.featureIconBox, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-            <MessageSquare color="#3b82f6" size={24} />
-          </View>
-          <View style={styles.featureInfo}>
-            <Text style={styles.featureTitle}>Workspace Copilot Chat</Text>
-            <Text style={styles.featureSub}>Chat directly with your AWS-hosted Gemma 4 12B model.</Text>
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate('Voice')}>
-        <GlassCard style={styles.featureCard} borderColor="rgba(16, 185, 129, 0.25)">
-          <View style={[styles.featureIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-            <Mic color="#10b981" size={24} />
-          </View>
-          <View style={styles.featureInfo}>
-            <Text style={styles.featureTitle}>Voice Input Mode</Text>
-            <Text style={styles.featureSub}>Speak your prompt ideas naturally with live audio transcription.</Text>
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
+        {/* Card 4: Normal Chat mode */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Chat')}
+        >
+          <GlassCard style={styles.smallCard}>
+            <View style={styles.smallRow}>
+              <View style={[styles.smallIconCircle, styles.blueCircle]}>
+                <MessageSquare color="#3b82f6" size={20} />
+              </View>
+              <View style={styles.smallTextContainer}>
+                <Text style={styles.smallTitle}>Normal Chat mode</Text>
+                <Text style={styles.smallDesc}>Direct AI assistant access</Text>
+              </View>
+              <ArrowRight color={TOKENS.colors.textSoft} size={18} />
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
+      </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -101,105 +105,107 @@ export const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: TOKENS.colors.bgNebula,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
-  heroCard: {
-    marginBottom: 16,
-    padding: 20,
+  header: {
+    marginBottom: 28,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  title: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: TOKENS.colors.textMain,
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ec4899',
-    marginLeft: 6,
-    letterSpacing: 1,
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 6,
-  },
-  heroSub: {
-    fontSize: 13,
-    color: '#9ca3af',
-    lineHeight: 18,
-  },
-  inputCard: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e5e7eb',
-    marginBottom: 10,
-  },
-  textInput: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 12,
-    padding: 12,
-    color: '#ffffff',
-    fontSize: 13,
-    minHeight: 70,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 12,
-  },
-  glowButton: {
-    backgroundColor: '#ec4899',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glowButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  sectionHeader: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 12,
+    color: TOKENS.colors.textSoft,
+    lineHeight: 24,
+    fontWeight: '300',
   },
-  featureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+  grid: {
+    gap: 18,
   },
-  featureIconBox: {
+  mainCard: {
+    padding: 22,
+  },
+  iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
+    borderRadius: TOKENS.borderRadius.full,
     alignItems: 'center',
-    marginRight: 14,
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
   },
-  featureInfo: {
+  pinkCircle: {
+    backgroundColor: 'rgba(255, 0, 122, 0.15)',
+    borderColor: 'rgba(255, 0, 122, 0.3)',
+  },
+  purpleCircle: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: TOKENS.colors.textMain,
+    marginBottom: 8,
+  },
+  cardDesc: {
+    fontSize: 13,
+    color: TOKENS.colors.textSoft,
+    lineHeight: 20,
+    fontWeight: '300',
+    marginBottom: 18,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  smallCard: {
+    padding: 16,
+  },
+  smallRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  smallIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: TOKENS.borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    borderWidth: 1,
+  },
+  greenCircle: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  blueCircle: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  smallTextContainer: {
     flex: 1,
   },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#ffffff',
+  smallTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: TOKENS.colors.textMain,
     marginBottom: 2,
   },
-  featureSub: {
+  smallDesc: {
     fontSize: 12,
-    color: '#9ca3af',
-    lineHeight: 16,
+    color: TOKENS.colors.textSoft,
   },
 });

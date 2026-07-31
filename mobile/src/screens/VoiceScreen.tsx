@@ -1,59 +1,72 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
+import { TOKENS } from '../theme/tokens';
 import { Mic, MicOff, Sparkles } from 'lucide-react-native';
 
 export const VoiceScreen = ({ navigation }: any) => {
-  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      setIsRecording(false);
-      setTranscript("Design an ultra-modern dark mode landing page for an AI agent platform with magenta glowing glass cards.");
+  const toggleListening = () => {
+    if (isListening) {
+      setIsListening(false);
     } else {
-      setIsRecording(true);
-      setTranscript("Listening... Speak your prompt idea clearly.");
+      setIsListening(true);
+      setTranscript("Design a responsive dark-mode landing page with floating neon glassmorphic cards and interactive prompt builder.");
     }
   };
 
-  const handleSendToGlow = () => {
-    if (!transcript || isRecording) return;
+  const handleRefine = () => {
     navigation.navigate('Glow', { initialIdea: transcript });
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Voice Input Mode</Text>
-      <Text style={styles.subtitle}>Speak your prompt concepts naturally to auto-generate blueprints.</Text>
-
-      <GlassCard style={styles.micCard}>
-        <TouchableOpacity
-          style={[styles.micCircle, isRecording && styles.micCircleActive]}
-          onPress={toggleRecording}
-        >
-          {isRecording ? <MicOff color="#ffffff" size={40} /> : <Mic color="#ffffff" size={40} />}
-        </TouchableOpacity>
-
-        <Text style={styles.statusText}>
-          {isRecording ? "Recording Live Audio..." : "Tap Microphone to Speak"}
+      <View style={styles.header}>
+        <Text style={styles.title}>Voice Composer</Text>
+        <Text style={styles.subtitle}>
+          Speak your raw idea aloud. We'll capture it and refine it into a perfect prompt.
         </Text>
+      </View>
+
+      {/* Mic Button Circle */}
+      <View style={styles.micWrapper}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.micCircle, isListening && styles.micCircleActive]}
+          onPress={toggleListening}
+        >
+          {isListening ? (
+            <Mic color="#22c55e" size={48} />
+          ) : (
+            <MicOff color={TOKENS.colors.textSoft} size={48} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Transcript Panel */}
+      <GlassCard style={styles.transcriptCard}>
+        <Text style={styles.transcriptLabel}>Live Speech Transcript</Text>
+        <TextInput
+          style={styles.transcriptInput}
+          placeholder={isListening ? "Listening..." : "Tap the microphone to start speaking..."}
+          placeholderTextColor="rgba(255, 255, 255, 0.3)"
+          value={transcript}
+          onChangeText={setTranscript}
+          multiline
+        />
       </GlassCard>
 
-      {/* Live Transcript Display */}
-      {transcript ? (
-        <GlassCard style={styles.card} borderColor="rgba(16, 185, 129, 0.4)">
-          <Text style={styles.transcriptLabel}>Live Speech Transcript</Text>
-          <Text style={styles.transcriptText}>{transcript}</Text>
-
-          {!isRecording && (
-            <TouchableOpacity style={styles.sendBtn} onPress={handleSendToGlow}>
-              <Sparkles color="#ffffff" size={16} />
-              <Text style={styles.sendBtnText}>Send to Prompt Architect (Glow)</Text>
-            </TouchableOpacity>
-          )}
-        </GlassCard>
+      {/* Refine Button */}
+      {transcript.trim() ? (
+        <TouchableOpacity style={styles.refineBtn} onPress={handleRefine}>
+          <Text style={styles.refineBtnText}>Refine This Prompt</Text>
+          <Sparkles color="#FFFFFF" size={18} />
+        </TouchableOpacity>
       ) : null}
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 };
@@ -61,77 +74,86 @@ export const VoiceScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: TOKENS.colors.bgNebula,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: '800',
+    color: TOKENS.colors.textMain,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#9ca3af',
-    marginBottom: 20,
+    fontSize: 14,
+    color: TOKENS.colors.textSoft,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  micCard: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    marginBottom: 16,
+  micWrapper: {
+    marginBottom: 32,
   },
   micCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#10b981',
-    justifyContent: 'center',
+    width: 120,
+    height: 120,
+    borderRadius: TOKENS.borderRadius.full,
+    backgroundColor: TOKENS.colors.glassSurface,
+    borderWidth: 2,
+    borderColor: TOKENS.colors.glassBorder,
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
+    justifyContent: 'center',
   },
   micCircleActive: {
-    backgroundColor: '#ef4444',
-    shadowColor: '#ef4444',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: '#22c55e',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  statusText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  card: {
-    marginBottom: 16,
+  transcriptCard: {
+    width: '100%',
+    padding: 18,
+    marginBottom: 24,
+    minHeight: 160,
   },
   transcriptLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#10b981',
-    marginBottom: 6,
+    fontWeight: '600',
+    color: TOKENS.colors.textSoft,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  transcriptText: {
-    fontSize: 14,
-    color: '#e5e7eb',
-    lineHeight: 20,
-    marginBottom: 14,
+  transcriptInput: {
+    color: TOKENS.colors.textMain,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlignVertical: 'top',
+    minHeight: 100,
   },
-  sendBtn: {
-    backgroundColor: '#10b981',
-    borderRadius: 10,
-    paddingVertical: 10,
+  refineBtn: {
+    width: '100%',
+    backgroundColor: TOKENS.colors.primaryAccent,
+    borderRadius: TOKENS.borderRadius.md,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    ...TOKENS.shadows.pinkGlow,
   },
-  sendBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginLeft: 6,
+  refineBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
