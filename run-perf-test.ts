@@ -391,7 +391,7 @@ async function main() {
 
   // Parse original credentials
   const endpointMatch = originalEnvContent.match(/AWS_LLM_ENDPOINT="(.*?)"/);
-  const originalEndpoint = endpointMatch ? endpointMatch[1] : 'http://13.60.137.114:8000/v1';
+  const originalEndpoint = endpointMatch ? endpointMatch[1] : 'http://localhost:8000/v1';
 
   try {
     // ----------------------------------------------------
@@ -719,7 +719,7 @@ async function main() {
     ['Target API Endpoint', SERVER_URL, 'Local gateway server forwarding requests'],
     ['Authentication Provider', 'Firebase Authentication', 'Email-password credential authorization'],
     ['Firestore Database ID', PROJECT_ID, 'Live Firestore cloud database instance'],
-    ['AWS vLLM Model Name', 'google/gemma-4-12B-it-qat-w4a16-ct', 'AWS EC2 served AI Model'],
+    ['AWS vLLM Model Name', 'gemma-4-model', 'AWS EC2 served AI Model'],
     ['Max Concurrent VUs (Sandbox)', '100 VUs', 'Peak load capacity simulation'],
     ['Ramp-up (Sandbox)', '10 seconds', 'Gradual concurrency increase timeline'],
     ['Ramp-down (Sandbox)', '10 seconds', 'Gradual concurrency decrease timeline'],
@@ -1040,7 +1040,7 @@ Under **Live GPU Inference Mode (10 concurrent VUs)**, the AWS EC2 GPU server ru
 * **Continuous Request Duration**: 60 seconds
 * **Concurrent VUs (Live GPU Phase)**: 10 concurrent virtual users (to isolate model baseline)
 * **Target Environment**: Local API Gateway hosting client endpoints, linked to active Firestore and AWS GPU inference.
-* **AWS vLLM GPU Server Model**: \`google/gemma-4-12B-it-qat-w4a16-ct\`
+* **AWS vLLM GPU Server Model**: \`gemma-4-model\`
 * **Database Instance**: Firebase Cloud Firestore ID \`${PROJECT_ID}\`
 
 ---
