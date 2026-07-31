@@ -13,3 +13,5 @@ PromptGlow_Performance_*
 security-reports/
 unified-reports/
 e2e_tests/reports/
+mobile/.expo/
+mobile/node_modules/
