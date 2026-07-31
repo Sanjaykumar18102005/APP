@@ -6,7 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType, getApiUrl, cleanOutput } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
-import { incrementUserStat } from '../lib/user-service';
+import { incrementUserStat, savePromptHistoryToFirestore } from '../lib/user-service';
 
 type Question = {
   question: string;
@@ -43,8 +43,11 @@ export function PromptBuilder() {
         history.unshift({ idea: initialIdea, prompt: finalPrompt, date: new Date().toISOString() });
         localStorage.setItem('prompt_history', JSON.stringify(history.slice(0, 20)));
       }
+      if (user?.uid) {
+        savePromptHistoryToFirestore(user, initialIdea, finalPrompt, answers).catch(console.warn);
+      }
     }
-  }, [phase, finalPrompt, initialIdea]);
+  }, [phase, finalPrompt, initialIdea, user, answers]);
 
   const requestNextQuestion = async (currentAnswers: {q: string, a: string}[]) => {
     setPhase(Phase.ANALYZING);

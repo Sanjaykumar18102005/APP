@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { getApiUrl, cleanOutput } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
-import { incrementUserStat } from '../lib/user-service';
+import { incrementUserStat, saveChatMessageToFirestore } from '../lib/user-service';
 
 type Message = {
   role: 'user' | 'model';
@@ -53,9 +53,12 @@ export function Chat() {
       }
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'model', content: cleanOutput(data.text || "Error: Empty response") }]);
+      const newModelReply: Message = { role: 'model', content: cleanOutput(data.text || "Error: Empty response") };
+      const updatedMessages = [...messages, { role: 'user' as const, content: userMessage }, newModelReply];
+      setMessages(updatedMessages);
       if (user?.uid) {
         incrementUserStat(user.uid, 'totalChats').catch(console.warn);
+        saveChatMessageToFirestore(user, updatedMessages).catch(console.warn);
       }
       
     } catch (err: any) {

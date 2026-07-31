@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { getApiUrl, cleanOutput } from '../lib/utils';
 import { useAuth } from '../lib/auth-context';
-import { incrementUserStat } from '../lib/user-service';
+import { incrementUserStat, saveVisionScanToFirestore } from '../lib/user-service';
 
 export function Vision() {
   const { user } = useAuth();
@@ -95,9 +95,11 @@ export function Vision() {
           }
 
           const data = await response.json();
-          setResult(cleanOutput(data.text || "Could not analyze the image."));
+          const cleanedText = cleanOutput(data.text || "Could not analyze the image.");
+          setResult(cleanedText);
           if (user?.uid) {
             incrementUserStat(user.uid, 'totalVisionAnalyzed').catch(console.warn);
+            saveVisionScanToFirestore(user, dimensions?.ratio || "16:9", cleanedText).catch(console.warn);
           }
         } catch (err: any) {
           console.error("Vision Error:", err);

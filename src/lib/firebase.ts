@@ -41,7 +41,7 @@ let auth: any = null;
 if (isFirebaseConfigured) {
   try {
     app = initializeApp(firebaseConfig as any);
-    db = firebaseConfig.firestoreDatabaseId 
+    db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)') 
       ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
       : getFirestore(app);
     auth = getAuth(app);

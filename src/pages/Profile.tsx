@@ -5,12 +5,12 @@ import { isFirebaseConfigured, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { UserDocData } from '../lib/user-service';
+import { UserDocData, fetchUserHistoryFromFirestore } from '../lib/user-service';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
 
 export function Profile() {
-  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
+  const { user, authError, loginWithGoogle, loginAsGuest, logout } = useAuth();
   const [view, setView] = useState<ViewMode>('main');
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
@@ -386,7 +386,14 @@ export function Profile() {
             <User className="w-10 h-10 text-text-soft" />
           </div>
           <h2 className="text-3xl font-display font-bold mb-2">Welcome to PromptGlow</h2>
-          <p className="text-text-soft mb-8">Sign in to save your prompts, sync your history, and access premium AI features.</p>
+          <p className="text-text-soft mb-6">Sign in to save your prompts, sync your history, and access premium AI features.</p>
+          
+          {authError && (
+            <div className="w-full mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs text-left leading-relaxed">
+              <span className="font-bold block text-red-400 mb-1">Authentication Notice:</span>
+              {authError}
+            </div>
+          )}
           
           <button 
             onClick={handleLogin}

@@ -14,6 +14,8 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   loginWithGoogle: () => Promise<void>;
   loginAsGuest: () => void;
   logout: () => Promise<void>;
@@ -23,11 +25,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(() => {
-    // Check if sandboxed guest is already saved in localStorage
     const saved = localStorage.getItem('promptglow_sandbox_user');
     return saved ? JSON.parse(saved) : null;
   });
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -36,7 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      // Only set Firebase user if not in guest mode
       const sandboxSaved = localStorage.getItem('promptglow_sandbox_user');
       if (sandboxSaved) {
         setUser(JSON.parse(sandboxSaved));
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           photoURL: firebaseUser.photoURL,
         };
         setUser(u);
+        setAuthError(null);
         syncUserProfile(u).catch(err => console.warn("Failed to sync profile:", err));
       } else {
         setUser(null);
@@ -63,22 +65,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = async () => {
+    setAuthError(null);
     if (!isFirebaseConfigured || !auth) {
-      console.warn("Firebase not loaded. Activating Sandbox Guest mode fallback.");
-      loginAsGuest();
-      return;
+      const msg = "Firebase is not configured cleanly in environment settings. Please verify VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID.";
+      setAuthError(msg);
+      throw new Error(msg);
     }
     try {
       localStorage.removeItem('promptglow_sandbox_user');
       await signInWithGoogle();
     } catch (e: any) {
-      console.error("Firebase popup sign-in encounter error. Attempting Sandbox Guest fallback:", e);
-      // If error is related to popup blocking, third-party cookies, canceled window, etc., activate Guest fallback
-      loginAsGuest();
+      const errMsg = e?.message || "Google sign-in popup error occurred.";
+      console.error("Firebase Sign-In Error:", errMsg);
+      setAuthError(errMsg);
+      throw e;
     }
   };
 
   const loginAsGuest = () => {
+    setAuthError(null);
     const guestUser: UserProfile = {
       uid: 'sandbox_guest_user',
       displayName: 'Sandbox Explorer',
@@ -91,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    setAuthError(null);
     localStorage.removeItem('promptglow_sandbox_user');
     setUser(null);
     if (isFirebaseConfigured && auth) {
@@ -102,8 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearAuthError = () => setAuthError(null);
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ user, loading, authError, clearAuthError, loginWithGoogle, loginAsGuest, logout }}>
       {children}
     </AuthContext.Provider>
   );
