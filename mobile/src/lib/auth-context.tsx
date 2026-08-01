@@ -58,6 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // webClientId: The Firebase Web Client ID for production
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: FIREBASE_WEB_CLIENT_ID,
+    androidClientId: FIREBASE_WEB_CLIENT_ID,
+    iosClientId: FIREBASE_WEB_CLIENT_ID,
     selectAccount: true,
   });
 
