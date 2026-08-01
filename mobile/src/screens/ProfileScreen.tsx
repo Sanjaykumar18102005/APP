@@ -7,6 +7,7 @@ import {
   ScrollView, 
   ActivityIndicator, 
   Modal, 
+  TextInput,
   Image as RNImage 
 } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
@@ -15,6 +16,7 @@ import { useAuth } from '../lib/auth-context';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchUserHistoryFromFirestore } from '../lib/user-service';
 import { 
   User, 
   LayoutList, 
@@ -27,32 +29,42 @@ import {
   Trash2, 
   LogOut, 
   Sparkles, 
-  X 
+  X,
+  Mail,
+  Lock,
+  UserPlus
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
+type AuthMode = 'login' | 'register';
 
 export const ProfileScreen = () => {
   const { theme, setTheme, colors } = useTheme();
-  const { user, loginAsGuest, logout } = useAuth();
+  const { user, authError, clearAuthError, loginWithEmail, registerWithEmail, loginAsGuest, logout } = useAuth();
   const [view, setView] = useState<ViewMode>('main');
-  
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+
+  // Form states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
   // Data states
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [userDoc, setUserDoc] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  
-  // Modal state for viewing/copying/deleting prompts
+
+  // Modal state
   const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null);
 
-  // Fetch prompts & live user doc from Firestore
   useEffect(() => {
     if (user?.uid) {
       fetchUserPrompts();
-      fetchLocalHistory();
+      fetchHistory();
     }
   }, [user]);
 
@@ -71,16 +83,7 @@ export const ProfileScreen = () => {
     setLoading(true);
     if (user?.isSandbox) {
       const saved = await AsyncStorage.getItem('sandbox_saved_prompts');
-      const parsed = saved ? JSON.parse(saved) : [
-        {
-          id: 'demo-1',
-          title: 'Landing Page Design Master Prompt',
-          content: 'Act as a principal UI/UX architect creating a dark glassmorphic landing page with glowing neon highlights, responsive grid cards, and smooth micro-interactions.',
-          category: 'Design',
-          createdAtFormatted: 'Just now'
-        }
-      ];
-      setPrompts(parsed);
+      setPrompts(saved ? JSON.parse(saved) : []);
       setLoading(false);
       return;
     }
@@ -102,22 +105,34 @@ export const ProfileScreen = () => {
     }
   };
 
-  const fetchLocalHistory = async () => {
-    try {
+  const fetchHistory = async () => {
+    if (user?.isSandbox) {
       const saved = await AsyncStorage.getItem('prompt_history');
       if (saved) {
         setHistoryItems(JSON.parse(saved));
+      }
+      return;
+    }
+
+    if (user?.uid) {
+      const history = await fetchUserHistoryFromFirestore(user.uid);
+      setHistoryItems(history);
+    }
+  };
+
+  const handleEmailAuth = async () => {
+    if (!email.trim() || !password.trim()) return;
+    setAuthSubmitting(true);
+    try {
+      if (authMode === 'login') {
+        await loginWithEmail(email.trim(), password.trim());
       } else {
-        setHistoryItems([
-          {
-            idea: 'Python Web Scraper',
-            prompt: 'Build a resilient Python web scraper using BeautifulSoup and requests with retry capabilities.',
-            date: new Date().toISOString()
-          }
-        ]);
+        await registerWithEmail(email.trim(), password.trim(), displayName.trim());
       }
     } catch (e) {
-      console.warn("History fetch error:", e);
+      console.warn("Auth submit error:", e);
+    } finally {
+      setAuthSubmitting(false);
     }
   };
 
@@ -146,25 +161,103 @@ export const ProfileScreen = () => {
     }
   };
 
-  // If user is not logged in, show Auth Login Screen
+  // UNAUTHENTICATED: Show Email/Password Login & Register Form
   if (!user) {
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.bgNebula }]} contentContainerStyle={styles.centerContent}>
         <GlassCard style={styles.authCard}>
           <View style={[styles.authAvatarCircle, { backgroundColor: colors.inputBg, borderColor: colors.glassBorder }]}>
-            <User color={colors.textSoft} size={40} />
+            <User color={colors.primaryAccent} size={36} />
           </View>
-          <Text style={[styles.authTitle, { color: colors.textMain }]}>Welcome to PromptGlow</Text>
+          <Text style={[styles.authTitle, { color: colors.textMain }]}>
+            {authMode === 'login' ? 'Sign In to PromptGlow' : 'Create Account'}
+          </Text>
           <Text style={[styles.authSub, { color: colors.textSoft }]}>
-            Sign in to save your prompts, sync your history, and access premium AI features across web and mobile.
+            {authMode === 'login' ? 'Enter your credentials to access your saved prompts & history.' : 'Join PromptGlow to sync AI prompts across web and mobile.'}
           </Text>
 
+          {authError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{authError}</Text>
+            </View>
+          )}
+
+          {authMode === 'register' && (
+            <View style={styles.inputWrapper}>
+              <User color={colors.textSoft} size={18} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.authInput, { color: colors.textMain }]}
+                placeholder="Full Name"
+                placeholderTextColor={colors.textMuted}
+                value={displayName}
+                onChangeText={setDisplayName}
+              />
+            </View>
+          )}
+
+          <View style={styles.inputWrapper}>
+            <Mail color={colors.textSoft} size={18} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.authInput, { color: colors.textMain }]}
+              placeholder="Email Address"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+            />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Lock color={colors.textSoft} size={18} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.authInput, { color: colors.textMain }]}
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
+
           <TouchableOpacity 
-            style={[styles.guestBtn, { backgroundColor: colors.primaryAccent }]}
+            style={[styles.primaryAuthBtn, { backgroundColor: colors.primaryAccent }]}
+            onPress={handleEmailAuth}
+            disabled={authSubmitting}
+          >
+            {authSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.primaryAuthBtnText}>
+                {authMode === 'login' ? 'Sign In' : 'Create Account'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.toggleAuthModeBtn} 
+            onPress={() => {
+              clearAuthError();
+              setAuthMode(authMode === 'login' ? 'register' : 'login');
+            }}
+          >
+            <Text style={[styles.toggleAuthText, { color: colors.secondaryAccent }]}>
+              {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.orDividerRow}>
+            <View style={styles.orLine} />
+            <Text style={[styles.orText, { color: colors.textMuted }]}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.guestBtn, { borderColor: colors.glassBorder }]}
             onPress={loginAsGuest}
           >
-            <Sparkles color="#FFFFFF" size={18} />
-            <Text style={styles.guestBtnText}>Sign in as Sandbox Guest</Text>
+            <Sparkles color={colors.primaryAccent} size={18} />
+            <Text style={[styles.guestBtnText, { color: colors.textMain }]}>Continue as Sandbox Guest</Text>
           </TouchableOpacity>
         </GlassCard>
       </ScrollView>
@@ -185,7 +278,7 @@ export const ProfileScreen = () => {
 
       {view === 'main' && (
         <>
-          {/* User Hero Card with Live Data */}
+          {/* User Hero Card */}
           <GlassCard style={styles.userCard} pinkGlow>
             <View style={styles.userRow}>
               {user.photoURL ? (
@@ -215,7 +308,7 @@ export const ProfileScreen = () => {
             </View>
           </GlassCard>
 
-          {/* Live Firestore Metrics Grid */}
+          {/* Live Metrics Grid */}
           <View style={styles.metricsGrid}>
             <GlassCard style={styles.metricCard}>
               <Text style={[styles.metricValue, { color: colors.primaryAccent }]}>
@@ -362,7 +455,7 @@ export const ProfileScreen = () => {
         </View>
       )}
 
-      {/* SETTINGS VIEW WITH WORKING THEME TOGGLE */}
+      {/* SETTINGS VIEW */}
       {view === 'settings' && (
         <View style={styles.sectionContainer}>
           <Text style={[styles.sectionTitle, { color: colors.textMain }]}>App Settings</Text>
@@ -419,7 +512,7 @@ export const ProfileScreen = () => {
         </View>
       )}
 
-      {/* INTERACTIVE PROMPT MODAL FOR VIEWING & COPYING */}
+      {/* INTERACTIVE PROMPT DETAIL MODAL */}
       {selectedPrompt && (
         <Modal transparent animationType="fade" visible={!!selectedPrompt}>
           <View style={styles.modalOverlay}>
@@ -488,24 +581,92 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   authAvatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   authTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   authSub: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  errorBox: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginBottom: 14,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+  },
+  inputWrapper: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  authInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 14,
+  },
+  primaryAuthBtn: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  primaryAuthBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  toggleAuthModeBtn: {
+    marginBottom: 16,
+  },
+  toggleAuthText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 10,
+    width: '100%',
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  orText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   guestBtn: {
     width: '100%',
@@ -515,11 +676,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    borderWidth: 1,
+    marginTop: 8,
   },
   guestBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
   backBtn: {
     flexDirection: 'row',

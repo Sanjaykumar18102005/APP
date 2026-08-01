@@ -2,15 +2,20 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
 import { Sparkles, Image, Mic, MessageSquare, ArrowRight } from 'lucide-react-native';
-import { TOKENS } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 export const HomeScreen = ({ navigation }: any) => {
+  const { colors } = useTheme();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.bgNebula }]} 
+      contentContainerStyle={styles.content}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>PromptGlow</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.textMain }]}>PromptGlow</Text>
+        <Text style={[styles.subtitle, { color: colors.textSoft }]}>
           Your AI command center.{'\n'}
           Transform abstract ideas into perfect prompts.
         </Text>
@@ -25,15 +30,15 @@ export const HomeScreen = ({ navigation }: any) => {
         >
           <GlassCard style={styles.mainCard} pinkGlow>
             <View style={[styles.iconCircle, styles.pinkCircle]}>
-              <Sparkles color={TOKENS.colors.primaryAccent} size={24} />
+              <Sparkles color={colors.primaryAccent} size={24} />
             </View>
-            <Text style={styles.cardTitle}>Refine Prompt</Text>
-            <Text style={styles.cardDesc}>
+            <Text style={[styles.cardTitle, { color: colors.textMain }]}>Refine Prompt</Text>
+            <Text style={[styles.cardDesc, { color: colors.textSoft }]}>
               Start with a vague idea and let our AI guide you through an adaptive branching process to create a world-class prompt.
             </Text>
             <View style={styles.actionRow}>
-              <Text style={[styles.actionText, { color: TOKENS.colors.primaryAccent }]}>Start Building</Text>
-              <ArrowRight color={TOKENS.colors.primaryAccent} size={16} style={{ marginLeft: 6 }} />
+              <Text style={[styles.actionText, { color: colors.primaryAccent }]}>Start Building</Text>
+              <ArrowRight color={colors.primaryAccent} size={16} style={{ marginLeft: 6 }} />
             </View>
           </GlassCard>
         </TouchableOpacity>
@@ -45,15 +50,15 @@ export const HomeScreen = ({ navigation }: any) => {
         >
           <GlassCard style={styles.mainCard} glow>
             <View style={[styles.iconCircle, styles.purpleCircle]}>
-              <Image color={TOKENS.colors.secondaryAccent} size={24} />
+              <Image color={colors.secondaryAccent} size={24} />
             </View>
-            <Text style={styles.cardTitle}>Reverse Engineer Image</Text>
-            <Text style={styles.cardDesc}>
+            <Text style={[styles.cardTitle, { color: colors.textMain }]}>Reverse Engineer Image</Text>
+            <Text style={[styles.cardDesc, { color: colors.textSoft }]}>
               Upload an image and we'll analyze it using Gemini Vision to generate the exact Midjourney or Stable Diffusion prompt.
             </Text>
             <View style={styles.actionRow}>
-              <Text style={[styles.actionText, { color: TOKENS.colors.secondaryAccent }]}>Try Vision</Text>
-              <ArrowRight color={TOKENS.colors.secondaryAccent} size={16} style={{ marginLeft: 6 }} />
+              <Text style={[styles.actionText, { color: colors.secondaryAccent }]}>Try Vision</Text>
+              <ArrowRight color={colors.secondaryAccent} size={16} style={{ marginLeft: 6 }} />
             </View>
           </GlassCard>
         </TouchableOpacity>
@@ -69,10 +74,10 @@ export const HomeScreen = ({ navigation }: any) => {
                 <Mic color="#22c55e" size={20} />
               </View>
               <View style={styles.smallTextContainer}>
-                <Text style={styles.smallTitle}>Voice Prompting</Text>
-                <Text style={styles.smallDesc}>Draft prompts by talking aloud</Text>
+                <Text style={[styles.smallTitle, { color: colors.textMain }]}>Voice Prompting</Text>
+                <Text style={[styles.smallDesc, { color: colors.textSoft }]}>Draft prompts by talking aloud</Text>
               </View>
-              <ArrowRight color={TOKENS.colors.textSoft} size={18} />
+              <ArrowRight color={colors.textSoft} size={18} />
             </View>
           </GlassCard>
         </TouchableOpacity>
@@ -88,10 +93,10 @@ export const HomeScreen = ({ navigation }: any) => {
                 <MessageSquare color="#3b82f6" size={20} />
               </View>
               <View style={styles.smallTextContainer}>
-                <Text style={styles.smallTitle}>Normal Chat mode</Text>
-                <Text style={styles.smallDesc}>Direct AI assistant access</Text>
+                <Text style={[styles.smallTitle, { color: colors.textMain }]}>Normal Chat mode</Text>
+                <Text style={[styles.smallDesc, { color: colors.textSoft }]}>Direct AI assistant access</Text>
               </View>
-              <ArrowRight color={TOKENS.colors.textSoft} size={18} />
+              <ArrowRight color={colors.textSoft} size={18} />
             </View>
           </GlassCard>
         </TouchableOpacity>
@@ -105,7 +110,6 @@ export const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TOKENS.colors.bgNebula,
   },
   content: {
     paddingHorizontal: 20,
@@ -117,13 +121,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: '800',
-    color: TOKENS.colors.textMain,
     marginBottom: 8,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: TOKENS.colors.textSoft,
     lineHeight: 24,
     fontWeight: '300',
   },
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: TOKENS.borderRadius.full,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -153,12 +155,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: TOKENS.colors.textMain,
     marginBottom: 8,
   },
   cardDesc: {
     fontSize: 13,
-    color: TOKENS.colors.textSoft,
     lineHeight: 20,
     fontWeight: '300',
     marginBottom: 18,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   smallIconCircle: {
     width: 40,
     height: 40,
-    borderRadius: TOKENS.borderRadius.full,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -201,11 +201,9 @@ const styles = StyleSheet.create({
   smallTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: TOKENS.colors.textMain,
     marginBottom: 2,
   },
   smallDesc: {
     fontSize: 12,
-    color: TOKENS.colors.textSoft,
   },
 });

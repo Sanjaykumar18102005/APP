@@ -77,7 +77,7 @@ export async function incrementUserStat(uid: string, statName: 'totalPromptsGene
   }
 }
 
-export async function savePromptHistoryToFirestore(user: { uid: string; email?: string | null }, idea: string, prompt: string) {
+export async function savePromptHistoryToFirestore(user: { uid: string; email?: string | null }, idea: string, prompt: string, answers?: any[]) {
   if (!user || !user.uid || user.uid === 'sandbox_guest_user' || !db) return;
   const now = new Date();
   try {
@@ -86,11 +86,26 @@ export async function savePromptHistoryToFirestore(user: { uid: string; email?: 
       userEmail: user.email || '',
       idea: idea || '',
       prompt: prompt || '',
+      answers: answers || [],
       createdAt: now.getTime(),
       createdAtFormatted: now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
     });
   } catch (err) {
     console.warn("Failed to save prompt history to Firestore:", err);
+  }
+}
+
+export async function fetchUserHistoryFromFirestore(uid: string) {
+  if (!db || !uid || uid === 'sandbox_guest_user') return [];
+  try {
+    const q = query(collection(db, 'promptHistory'), where('userId', '==', uid));
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list;
+  } catch (err) {
+    console.warn("Failed to fetch prompt history from Firestore:", err);
+    return [];
   }
 }
 

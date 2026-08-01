@@ -11,9 +11,11 @@ import {
   Platform 
 } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
-import { TOKENS } from '../theme/tokens';
-import { getApiUrl } from '../config/api';
+import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../lib/auth-context';
+import { getApiUrl, cleanOutput } from '../lib/utils';
 import { Sparkles, User, Send } from 'lucide-react-native';
+import { saveChatMessageToFirestore, incrementUserStat } from '../lib/user-service';
 
 type Message = {
   role: 'user' | 'model';
@@ -21,6 +23,8 @@ type Message = {
 };
 
 export const ChatScreen = () => {
+  const { colors } = useTheme();
+  const { user } = useAuth();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { 
@@ -36,7 +40,8 @@ export const ChatScreen = () => {
 
     const userMsg = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    const updatedMessages = [...messages, { role: 'user' as const, content: userMsg }];
+    setMessages(updatedMessages);
     setIsTyping(true);
 
     try {
@@ -44,14 +49,18 @@ export const ChatScreen = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            ...messages,
-            { role: 'user', content: userMsg }
-          ]
+          messages: updatedMessages
         })
       });
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: 'model', content: data.text || "No response received." }]);
+      const cleaned = cleanOutput(data.text || "No response received.");
+      const finalMsgs: Message[] = [...updatedMessages, { role: 'model', content: cleaned }];
+      setMessages(finalMsgs);
+
+      if (user?.uid) {
+        saveChatMessageToFirestore(user, finalMsgs).catch(console.warn);
+        incrementUserStat(user.uid, 'totalChats').catch(console.warn);
+      }
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: 'model', content: `AI Error: ${err.message || 'Unknown server error.'}` }]);
     } finally {
@@ -61,16 +70,16 @@ export const ChatScreen = () => {
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.bgNebula }]} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={80}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
         <View style={styles.iconCircle}>
           <Sparkles color="#3b82f6" size={20} />
         </View>
-        <Text style={styles.title}>Workspace Chat</Text>
+        <Text style={[styles.title, { color: colors.textMain }]}>Workspace Chat</Text>
       </View>
 
       {/* Messages Scroll Area */}
@@ -91,51 +100,55 @@ export const ChatScreen = () => {
             <View 
               style={[
                 styles.avatarCircle, 
-                msg.role === 'user' ? styles.userAvatar : styles.modelAvatar
+                msg.role === 'user' 
+                  ? { backgroundColor: colors.bgSurface, borderColor: colors.glassBorder } 
+                  : { backgroundColor: 'rgba(255, 0, 122, 0.15)', borderColor: 'rgba(255, 0, 122, 0.3)' }
               ]}
             >
               {msg.role === 'user' ? (
-                <User color={TOKENS.colors.textSoft} size={16} />
+                <User color={colors.textSoft} size={16} />
               ) : (
-                <Sparkles color={TOKENS.colors.primaryAccent} size={16} />
+                <Sparkles color={colors.primaryAccent} size={16} />
               )}
             </View>
 
             <GlassCard 
               style={[
                 styles.msgBubble, 
-                msg.role === 'user' ? styles.userBubble : styles.modelBubble
+                msg.role === 'user' 
+                  ? { backgroundColor: colors.bgSurface } 
+                  : { backgroundColor: colors.glassSurface }
               ]}
               pinkGlow={msg.role === 'model'}
             >
-              <Text style={styles.msgText}>{msg.content}</Text>
+              <Text style={[styles.msgText, { color: colors.textMain }]}>{msg.content}</Text>
             </GlassCard>
           </View>
         ))}
 
         {isTyping && (
           <View style={[styles.msgRow, styles.modelRow]}>
-            <View style={[styles.avatarCircle, styles.modelAvatar]}>
-              <Sparkles color={TOKENS.colors.primaryAccent} size={16} />
+            <View style={[styles.avatarCircle, { backgroundColor: 'rgba(255, 0, 122, 0.15)', borderColor: 'rgba(255, 0, 122, 0.3)' }]}>
+              <Sparkles color={colors.primaryAccent} size={16} />
             </View>
-            <GlassCard style={[styles.msgBubble, styles.modelBubble]}>
-              <ActivityIndicator color={TOKENS.colors.primaryAccent} size="small" />
+            <GlassCard style={[styles.msgBubble, { backgroundColor: colors.glassSurface }]}>
+              <ActivityIndicator color={colors.primaryAccent} size="small" />
             </GlassCard>
           </View>
         )}
       </ScrollView>
 
       {/* Input Bar */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, { backgroundColor: colors.bgSurface, borderTopColor: colors.glassBorder }]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.glassBorder, color: colors.textMain }]}
           placeholder="Ask me anything..."
-          placeholderTextColor="rgba(255, 255, 255, 0.3)"
+          placeholderTextColor={colors.textMuted}
           value={input}
           onChangeText={setInput}
         />
         <TouchableOpacity 
-          style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]} 
+          style={[styles.sendBtn, { backgroundColor: colors.primaryAccent }, !input.trim() && styles.sendBtnDisabled]} 
           onPress={handleSend}
           disabled={!input.trim()}
         >
@@ -149,7 +162,6 @@ export const ChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TOKENS.colors.bgNebula,
   },
   header: {
     flexDirection: 'row',
@@ -158,12 +170,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TOKENS.colors.glassBorder,
   },
   iconCircle: {
     width: 40,
     height: 40,
-    borderRadius: TOKENS.borderRadius.md,
+    borderRadius: 12,
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(59, 130, 246, 0.3)',
@@ -173,7 +184,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: TOKENS.colors.textMain,
   },
   messagesContainer: {
     flex: 1,
@@ -198,32 +208,17 @@ const styles = StyleSheet.create({
   avatarCircle: {
     width: 34,
     height: 34,
-    borderRadius: TOKENS.borderRadius.full,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-  },
-  userAvatar: {
-    backgroundColor: TOKENS.colors.bgSurface,
-    borderColor: TOKENS.colors.glassBorder,
-  },
-  modelAvatar: {
-    backgroundColor: 'rgba(255, 0, 122, 0.15)',
-    borderColor: 'rgba(255, 0, 122, 0.3)',
   },
   msgBubble: {
     flex: 1,
     padding: 14,
   },
-  userBubble: {
-    backgroundColor: TOKENS.colors.bgSurface,
-  },
-  modelBubble: {
-    backgroundColor: TOKENS.colors.glassSurface,
-  },
   msgText: {
     fontSize: 14,
-    color: TOKENS.colors.textMain,
     lineHeight: 22,
   },
   inputContainer: {
@@ -232,29 +227,22 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: TOKENS.colors.bgSurface,
     borderTopWidth: 1,
-    borderTopColor: TOKENS.colors.glassBorder,
   },
   input: {
     flex: 1,
     height: 48,
-    backgroundColor: TOKENS.colors.inputBg,
     borderWidth: 1,
-    borderColor: TOKENS.colors.glassBorder,
-    borderRadius: TOKENS.borderRadius.md,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    color: TOKENS.colors.textMain,
     fontSize: 14,
   },
   sendBtn: {
     width: 48,
     height: 48,
-    borderRadius: TOKENS.borderRadius.md,
-    backgroundColor: TOKENS.colors.primaryAccent,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    ...TOKENS.shadows.pinkGlow,
   },
   sendBtnDisabled: {
     opacity: 0.4,
