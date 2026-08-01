@@ -11,6 +11,7 @@ import {
   Platform 
 } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
+import { MarkdownView } from '../components/MarkdownView';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/auth-context';
 import { getApiUrl, cleanOutput } from '../lib/utils';
@@ -121,7 +122,7 @@ export const ChatScreen = () => {
               ]}
               pinkGlow={msg.role === 'model'}
             >
-              <Text style={[styles.msgText, { color: colors.textMain }]}>{msg.content}</Text>
+              <MarkdownView content={msg.content} textColor={colors.textMain} />
             </GlassCard>
           </View>
         ))}

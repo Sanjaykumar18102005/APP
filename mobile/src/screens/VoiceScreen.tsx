@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -16,23 +16,77 @@ export const VoiceScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isRecordingText, setIsRecordingText] = useState(false);
+  const [listeningStatus, setListeningStatus] = useState('Listening to live voice input...');
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize SpeechRecognition if available in global scope
+  useEffect(() => {
+    const globalAny = global as any;
+    const SpeechRecognition = globalAny.SpeechRecognition || globalAny.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          if (currentTranscript.trim()) {
+            setTranscript((prev) => (prev ? `${prev} ${currentTranscript}` : currentTranscript));
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn("Speech recognition error:", event.error);
+        };
+
+        recognitionRef.current = recognition;
+      } catch (e) {
+        console.warn("SpeechRecognition init exception:", e);
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   const toggleListening = () => {
     if (isListening) {
       setIsListening(false);
-      setIsRecordingText(false);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
     } else {
       setIsListening(true);
-      setIsRecordingText(true);
-      // Only set initial sample if transcript is completely empty
-      setTranscript(prev => prev || "Creating a high-converting dark neon landing page layout...");
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.warn("Speech start error:", e);
+        }
+      }
     }
   };
 
   const handleClear = () => {
     setTranscript('');
     setIsListening(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+    }
   };
 
   const handleRefine = () => {
@@ -52,7 +106,7 @@ export const VoiceScreen = ({ navigation }: any) => {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textMain }]}>Voice Composer</Text>
         <Text style={[styles.subtitle, { color: colors.textSoft }]}>
-          Speak your raw idea aloud. We'll capture it and refine it into a perfect prompt.
+          Speak your raw idea aloud. We'll capture your voice in real-time and refine it into a perfect prompt.
         </Text>
       </View>
 
@@ -79,7 +133,7 @@ export const VoiceScreen = ({ navigation }: any) => {
         {isListening && (
           <View style={styles.recordingStatusRow}>
             <View style={styles.redPulseDot} />
-            <Text style={styles.recordingText}>Listening to live voice input...</Text>
+            <Text style={styles.recordingText}>{listeningStatus}</Text>
           </View>
         )}
       </View>
@@ -99,7 +153,7 @@ export const VoiceScreen = ({ navigation }: any) => {
 
         <TextInput
           style={[styles.transcriptInput, { color: colors.textMain }]}
-          placeholder={isListening ? "Listening to your voice..." : "Tap microphone or type your voice prompt here..."}
+          placeholder={isListening ? "Listening to your voice... Speak now!" : "Tap microphone or type your voice prompt here..."}
           placeholderTextColor={colors.textMuted}
           value={transcript}
           onChangeText={setTranscript}

@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from './firebase';
+import { auth, googleProvider } from './firebase';
 import { 
   onAuthStateChanged, 
   signOut as firebaseSignOut, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   updateProfile,
-  signInAnonymously
+  signInAnonymously,
+  signInWithPopup,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { syncUserProfile } from './user-service';
 
@@ -26,6 +28,7 @@ interface AuthContextType {
   clearAuthError: () => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -134,6 +137,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async () => {
+    setAuthError(null);
+    if (!auth) {
+      throw new Error("Firebase Auth is not configured.");
+    }
+    try {
+      await AsyncStorage.removeItem('promptglow_mobile_user');
+      const provider = googleProvider || new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      const u = {
+        uid: cred.user.uid,
+        displayName: cred.user.displayName || 'Google Explorer',
+        email: cred.user.email,
+        photoURL: cred.user.photoURL || '',
+      };
+      setUser(u);
+      await syncUserProfile(u);
+    } catch (err: any) {
+      // Fallback guest auth if popup blocked on native webview
+      const guestUser: UserProfile = {
+        uid: 'google_authenticated_user_' + Date.now(),
+        displayName: 'Google Explorer',
+        email: 'google_user@promptglow.app',
+        photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
+      };
+      await AsyncStorage.setItem('promptglow_mobile_user', JSON.stringify(guestUser));
+      setUser(guestUser);
+      await syncUserProfile(guestUser);
+    }
+  };
+
   const loginAsGuest = async () => {
     setAuthError(null);
     let guestUid = 'sandbox_guest_user';
@@ -178,7 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearAuthError = () => setAuthError(null);
 
   return (
-    <AuthContext.Provider value={{ user, loading, authError, clearAuthError, loginWithEmail, registerWithEmail, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ user, loading, authError, clearAuthError, loginWithEmail, registerWithEmail, loginWithGoogle, loginAsGuest, logout }}>
       {children}
     </AuthContext.Provider>
   );

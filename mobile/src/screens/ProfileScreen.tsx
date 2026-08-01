@@ -41,7 +41,7 @@ type AuthMode = 'login' | 'register';
 
 export const ProfileScreen = () => {
   const { theme, setTheme, colors } = useTheme();
-  const { user, authError, clearAuthError, loginWithEmail, registerWithEmail, loginAsGuest, logout } = useAuth();
+  const { user, authError, clearAuthError, loginWithEmail, registerWithEmail, loginWithGoogle, loginAsGuest, logout } = useAuth();
   const [view, setView] = useState<ViewMode>('main');
   const [authMode, setAuthMode] = useState<AuthMode>('login');
 
@@ -253,7 +253,19 @@ export const ProfileScreen = () => {
           </View>
 
           <TouchableOpacity 
-            style={[styles.guestBtn, { borderColor: colors.glassBorder }]}
+            style={[styles.googleAuthBtn, { backgroundColor: '#ffffff', borderColor: colors.glassBorder }]}
+            onPress={loginWithGoogle}
+          >
+            <RNImage 
+              source={{ uri: 'https://lh3.googleusercontent.com/COxitImplementedG3d5_30' }} 
+              style={styles.googleIconImg} 
+              defaultSource={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
+            />
+            <Text style={styles.googleAuthBtnText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.guestBtn, { borderColor: colors.glassBorder, marginTop: 10 }]}
             onPress={loginAsGuest}
           >
             <Sparkles color={colors.primaryAccent} size={18} />
@@ -678,6 +690,26 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     marginTop: 8,
+  },
+  googleAuthBtn: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderWidth: 1,
+  },
+  googleIconImg: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  googleAuthBtnText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '700',
   },
   guestBtnText: {
     fontSize: 14,
