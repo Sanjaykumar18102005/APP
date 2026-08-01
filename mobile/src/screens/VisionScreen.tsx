@@ -306,11 +306,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   previewContainer: {
-    height: 200,
+    height: 220,
+    width: '100%',
     borderRadius: 14,
     overflow: 'hidden',
     marginBottom: 20,
-    position: 'relative',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   previewImage: {
     width: '100%',
