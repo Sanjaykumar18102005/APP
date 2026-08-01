@@ -32,7 +32,8 @@
           "photosPermission": "Allow PromptGlow to access your photos for Vision Image Reverse Engineering analysis."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ]
   }
 }

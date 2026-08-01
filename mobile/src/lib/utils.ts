@@ -21,7 +21,7 @@ export function cleanOutput(text: string): string {
 }
 
 export function getApiUrl(path: string): string {
-  const base = "https://promptglow-web-backend.onrender.com";
+  const base = process.env.EXPO_PUBLIC_API_BASE_URL || "https://promptglow-web-backend.onrender.com";
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;

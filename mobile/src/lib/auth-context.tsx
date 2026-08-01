@@ -46,7 +46,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 //   "Web SDK configuration" → "Web client ID"
 // Then replace the value below:
 // ============================================================
-const FIREBASE_WEB_CLIENT_ID = '987579083588-4g2sdq0o8upc9g9l2jcl7b6i6e5yfqcf.apps.googleusercontent.com';
+const FIREBASE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '987579083588-4g2sdq0o8upc9g9l2jcl7b6i6e5yfqcf.apps.googleusercontent.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -67,14 +67,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const handleGoogleResponse = async () => {
       if (response?.type === 'success') {
-        const { id_token, access_token } = response.authentication ?? {};
+        const authInfo = response.authentication as any;
+        const { idToken, accessToken } = authInfo ?? {};
         
         try {
           let credential;
-          if (id_token) {
-            credential = GoogleAuthProvider.credential(id_token);
-          } else if (access_token) {
-            credential = GoogleAuthProvider.credential(null, access_token);
+          const token = idToken || response.params?.id_token;
+          const rawAccessToken = accessToken || response.params?.access_token;
+
+          if (token) {
+            credential = GoogleAuthProvider.credential(token);
+          } else if (rawAccessToken) {
+            credential = GoogleAuthProvider.credential(null, rawAccessToken);
           } else {
             setAuthError('Google Sign-In failed: No token received.');
             return;

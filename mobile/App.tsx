@@ -22,6 +22,7 @@ function MainNavigator() {
   return (
     <SafeAreaProvider>
       <StatusBar style={theme === 'light' ? 'dark' : 'light'} backgroundColor={colors.bgNebula} />
+      {/* @ts-ignore */}
       <NavigationContainer>
         {/* @ts-ignore */}
         <Tab.Navigator
