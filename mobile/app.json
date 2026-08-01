@@ -3,6 +3,8 @@
     "name": "PromptGlow",
     "slug": "promptglow-mobile",
     "version": "1.0.0",
+    "scheme": "promptglow",
+    "newArchEnabled": true,
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
