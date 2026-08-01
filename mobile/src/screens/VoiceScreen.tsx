@@ -25,10 +25,8 @@ export const VoiceScreen = ({ navigation }: any) => {
     } else {
       setIsListening(true);
       setIsRecordingText(true);
-      // Simulating live audio stream input if microphone permission granted or manual text
-      if (!transcript) {
-        setTranscript("Creating a high-converting dark neon landing page layout...");
-      }
+      // Only set initial sample if transcript is completely empty
+      setTranscript(prev => prev || "Creating a high-converting dark neon landing page layout...");
     }
   };
 
@@ -38,7 +36,11 @@ export const VoiceScreen = ({ navigation }: any) => {
   };
 
   const handleRefine = () => {
-    navigation.navigate('Glow', { initialIdea: transcript });
+    if (!transcript.trim()) return;
+    navigation.navigate('Glow', { 
+      initialIdea: transcript.trim(),
+      initialPrompt: transcript.trim()
+    });
   };
 
   return (

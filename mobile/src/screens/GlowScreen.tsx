@@ -36,9 +36,9 @@ enum Phase {
 export const GlowScreen = ({ route }: any) => {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const initialIdeaParam = route?.params?.initialIdea || '';
+  const incomingParam = route?.params?.initialIdea || route?.params?.initialPrompt || '';
   const [phase, setPhase] = useState<Phase>(Phase.INIT);
-  const [initialIdea, setInitialIdea] = useState(initialIdeaParam);
+  const [initialIdea, setInitialIdea] = useState(incomingParam);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [answers, setAnswers] = useState<{ q: string; a: string }[]>([]);
   const [finalPrompt, setFinalPrompt] = useState('');
@@ -46,10 +46,11 @@ export const GlowScreen = ({ route }: any) => {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (initialIdeaParam) {
-      setInitialIdea(initialIdeaParam);
+    const incoming = route?.params?.initialIdea || route?.params?.initialPrompt || '';
+    if (incoming) {
+      setInitialIdea(incoming);
     }
-  }, [initialIdeaParam]);
+  }, [route?.params?.initialIdea, route?.params?.initialPrompt]);
 
   const requestNextQuestion = async (currentAnswers: { q: string; a: string }[]) => {
     setPhase(Phase.ANALYZING);

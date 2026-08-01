@@ -6,7 +6,8 @@ import {
   signOut as firebaseSignOut, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  signInAnonymously
 } from 'firebase/auth';
 import { syncUserProfile } from './user-service';
 
@@ -25,7 +26,7 @@ interface AuthContextType {
   clearAuthError: () => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
-  loginAsGuest: () => void;
+  loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -47,8 +48,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const u = {
               uid: firebaseUser.uid,
               displayName: firebaseUser.displayName || 'Explorer',
-              email: firebaseUser.email || '',
+              email: firebaseUser.email || (firebaseUser.isAnonymous ? 'guest@promptglow.sandbox' : ''),
               photoURL: firebaseUser.photoURL || '',
+              isSandbox: firebaseUser.isAnonymous,
             };
             setUser(u);
             syncUserProfile(u).catch(console.warn);
@@ -63,6 +65,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
   }, []);
+
+  const formatAuthError = (err: any): string => {
+    const code = err?.code || '';
+    const message = err?.message || '';
+
+    if (code === 'auth/operation-not-allowed' || message.includes('operation-not-allowed')) {
+      return "Email/Password Sign-In is disabled in Firebase Console. Please enable Email/Password provider under Authentication -> Sign-in method.";
+    }
+    if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+      return "Invalid email address or password. Please check your credentials.";
+    }
+    if (code === 'auth/email-already-in-use') {
+      return "An account already exists with this email. Please sign in instead.";
+    }
+    if (code === 'auth/weak-password') {
+      return "Password is too weak. Please use at least 6 characters.";
+    }
+    return message || "Authentication failed. Please try again.";
+  };
 
   const loginWithEmail = async (email: string, pass: string) => {
     setAuthError(null);
@@ -81,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(u);
       await syncUserProfile(u);
     } catch (err: any) {
-      const msg = err.message || "Invalid email or password.";
+      const msg = formatAuthError(err);
       setAuthError(msg);
       throw new Error(msg);
     }
@@ -107,22 +128,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(u);
       await syncUserProfile(u);
     } catch (err: any) {
-      const msg = err.message || "Registration failed. Check password length and email format.";
+      const msg = formatAuthError(err);
       setAuthError(msg);
       throw new Error(msg);
     }
   };
 
-  const loginAsGuest = () => {
+  const loginAsGuest = async () => {
     setAuthError(null);
+    let guestUid = 'sandbox_guest_user';
+
+    if (auth) {
+      try {
+        const anonCred = await signInAnonymously(auth);
+        if (anonCred?.user) {
+          guestUid = anonCred.user.uid;
+        }
+      } catch (e) {
+        console.warn("Anonymous firebase sign-in fallback:", e);
+      }
+    }
+
     const guestUser: UserProfile = {
-      uid: 'sandbox_guest_user',
+      uid: guestUid,
       displayName: 'Sandbox Explorer',
       email: 'explorer@promptglow.sandbox',
       photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
       isSandbox: true,
     };
-    AsyncStorage.setItem('promptglow_mobile_user', JSON.stringify(guestUser));
+
+    await AsyncStorage.setItem('promptglow_mobile_user', JSON.stringify(guestUser));
     setUser(guestUser);
     syncUserProfile(guestUser).catch(console.warn);
   };
