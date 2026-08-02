@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './firebase';
-import { 
-  onAuthStateChanged, 
-  signOut as firebaseSignOut, 
-  signInWithEmailAndPassword, 
+import {
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
   signInAnonymously,
@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 import { syncUserProfile } from './user-service';
 
 // Required for expo-auth-session to close the browser after OAuth
@@ -54,13 +55,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   // expo-auth-session Google provider — uses Expo Go proxy in development
-  // expoClientId: Uses auth.expo.io proxy (no real client ID needed for Expo Go dev)
-  // webClientId: The Firebase Web Client ID for production
   const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: FIREBASE_WEB_CLIENT_ID,
     webClientId: FIREBASE_WEB_CLIENT_ID,
-    androidClientId: FIREBASE_WEB_CLIENT_ID,
-    iosClientId: FIREBASE_WEB_CLIENT_ID,
     selectAccount: true,
+    redirectUri: AuthSession.makeRedirectUri({
+      scheme: 'promptglow',
+    }),
   });
 
   // Handle Google OAuth response
@@ -69,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response?.type === 'success') {
         const authInfo = response.authentication as any;
         const { idToken, accessToken } = authInfo ?? {};
-        
+
         try {
           let credential;
           const token = idToken || response.params?.id_token;

@@ -1,141 +1,246 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   TextInput,
-  ActivityIndicator
+  Alert,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
-import { Mic, MicOff, Sparkles, XCircle, Volume2 } from 'lucide-react-native';
+import { Mic, MicOff, Sparkles, XCircle } from 'lucide-react-native';
+import { getApiUrl } from '../lib/utils';
 
 export const VoiceScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
-  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [listeningStatus, setListeningStatus] = useState('Listening to live voice input...');
-  const recognitionRef = useRef<any>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
-  // Initialize SpeechRecognition if available in global scope
   useEffect(() => {
-    const globalAny = global as any;
-    const SpeechRecognition = globalAny.SpeechRecognition || globalAny.webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
+    // Request microphone permissions on mount
+    (async () => {
       try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onresult = (event: any) => {
-          let currentTranscript = '';
-          for (let i = 0; i < event.results.length; i++) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-          if (currentTranscript.trim()) {
-            setTranscript((prev) => (prev ? `${prev} ${currentTranscript}` : currentTranscript));
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn("Speech recognition error:", event.error);
-        };
-
-        recognitionRef.current = recognition;
+        const { granted } = await Audio.requestPermissionsAsync();
+        if (granted) {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+          });
+        }
       } catch (e) {
-        console.warn("SpeechRecognition init exception:", e);
+        console.warn('Audio permission error:', e);
       }
-    }
+    })();
 
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
       }
     };
   }, []);
 
-  const toggleListening = () => {
-    if (isListening) {
-      setIsListening(false);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
+  const startRecording = async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        Alert.alert('Permission Denied', 'Microphone access is required to use Voice Composer.');
+        return;
       }
-    } else {
-      setIsListening(true);
-      if (recognitionRef.current) {
+
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync({
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.m4a',
+          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      });
+
+      await recording.startAsync();
+      recordingRef.current = recording;
+      setIsRecording(true);
+    } catch (e: any) {
+      console.warn('Start recording error:', e);
+      Alert.alert('Recording Error', e.message || 'Could not access microphone.');
+    }
+  };
+
+  const stopRecordingAndTranscribe = async () => {
+    if (!recordingRef.current) return;
+
+    setIsRecording(false);
+    setIsTranscribing(true);
+
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+
+      if (!uri) {
+        setIsTranscribing(false);
+        return;
+      }
+
+      // Read audio file as base64
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
         try {
-          recognitionRef.current.start();
-        } catch (e) {
-          console.warn("Speech start error:", e);
+          const base64 = (reader.result as string).split(',')[1];
+          const mimeType = Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4';
+
+          const res = await fetch(getApiUrl('/api/transcribe'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioBase64: base64, mimeType }),
+          });
+
+          const data = await res.json();
+          if (data.text) {
+            setTranscript((prev) => (prev ? `${prev} ${data.text}` : data.text));
+          } else if (data.error) {
+            Alert.alert('Transcription Notice', data.error);
+          }
+        } catch (err: any) {
+          console.warn('Transcription error:', err);
+          Alert.alert('Notice', 'Voice captured. Type or refine your prompt below.');
+        } finally {
+          setIsTranscribing(false);
         }
-      }
+      };
+
+      reader.onerror = () => {
+        setIsTranscribing(false);
+      };
+
+      reader.readAsDataURL(blob);
+    } catch (e: any) {
+      console.warn('Stop recording error:', e);
+      setIsTranscribing(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecordingAndTranscribe();
+    } else {
+      startRecording();
     }
   };
 
   const handleClear = () => {
     setTranscript('');
-    setIsListening(false);
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {}
-    }
   };
 
   const handleRefine = () => {
     if (!transcript.trim()) return;
-    navigation.navigate('Glow', { 
+    navigation.navigate('Glow', {
       initialIdea: transcript.trim(),
-      initialPrompt: transcript.trim()
+      initialPrompt: transcript.trim(),
     });
   };
 
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: colors.bgNebula }]} 
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bgNebula }]}
       contentContainerStyle={styles.content}
     >
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textMain }]}>Voice Composer</Text>
         <Text style={[styles.subtitle, { color: colors.textSoft }]}>
-          Speak your raw idea aloud. We'll capture your voice in real-time and refine it into a perfect prompt.
+          Tap mic to start recording. Tap again to stop and transcribe into a prompt.
         </Text>
       </View>
 
-      {/* Mic Button Circle with Pulsing Effect */}
+      {/* Mic Button Circle */}
       <View style={styles.micWrapper}>
         <TouchableOpacity
           activeOpacity={0.8}
           style={[
             styles.micCircle,
-            { 
-              backgroundColor: isListening ? 'rgba(34, 197, 94, 0.15)' : colors.glassSurface,
-              borderColor: isListening ? '#22c55e' : colors.glassBorder 
-            }
+            {
+              backgroundColor: isRecording
+                ? 'rgba(239, 68, 68, 0.15)'
+                : isTranscribing
+                ? 'rgba(139, 92, 246, 0.15)'
+                : colors.glassSurface,
+              borderColor: isRecording
+                ? '#ef4444'
+                : isTranscribing
+                ? colors.secondaryAccent
+                : colors.glassBorder,
+            },
           ]}
-          onPress={toggleListening}
+          onPress={toggleRecording}
+          disabled={isTranscribing}
         >
-          {isListening ? (
-            <Mic color="#22c55e" size={48} />
+          {isTranscribing ? (
+            <ActivityIndicator color={colors.secondaryAccent} size="large" />
+          ) : isRecording ? (
+            <Mic color="#ef4444" size={48} />
           ) : (
             <MicOff color={colors.textSoft} size={48} />
           )}
         </TouchableOpacity>
 
-        {isListening && (
-          <View style={styles.recordingStatusRow}>
-            <View style={styles.redPulseDot} />
-            <Text style={styles.recordingText}>{listeningStatus}</Text>
-          </View>
-        )}
+        <View style={styles.recordingStatusRow}>
+          {isRecording && (
+            <>
+              <View style={styles.redPulseDot} />
+              <Text style={[styles.recordingText, { color: '#ef4444' }]}>
+                Listening to live voice input... (Tap to stop)
+              </Text>
+            </>
+          )}
+          {isTranscribing && (
+            <Text style={[styles.recordingText, { color: colors.secondaryAccent }]}>
+              Transcribing audio with AI...
+            </Text>
+          )}
+          {!isRecording && !isTranscribing && (
+            <Text style={[styles.recordingText, { color: colors.textSoft }]}>
+              Tap microphone to speak
+            </Text>
+          )}
+        </View>
       </View>
 
       {/* Live Speech & Editable Transcript Panel */}
@@ -153,18 +258,25 @@ export const VoiceScreen = ({ navigation }: any) => {
 
         <TextInput
           style={[styles.transcriptInput, { color: colors.textMain }]}
-          placeholder={isListening ? "Listening to your voice... Speak now!" : "Tap microphone or type your voice prompt here..."}
+          placeholder={
+            isRecording
+              ? 'Listening to your voice... Speak now!'
+              : isTranscribing
+              ? 'Transcribing audio...'
+              : 'Tap microphone or type your voice prompt here...'
+          }
           placeholderTextColor={colors.textMuted}
           value={transcript}
           onChangeText={setTranscript}
           multiline
+          editable={!isRecording && !isTranscribing}
         />
       </GlassCard>
 
       {/* Refine Button */}
       {transcript.trim() ? (
-        <TouchableOpacity 
-          style={[styles.refineBtn, { backgroundColor: colors.primaryAccent }]} 
+        <TouchableOpacity
+          style={[styles.refineBtn, { backgroundColor: colors.primaryAccent }]}
           onPress={handleRefine}
         >
           <Text style={styles.refineBtnText}>Refine This Prompt</Text>
@@ -226,7 +338,6 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     fontSize: 12,
-    color: '#22c55e',
     fontWeight: '600',
   },
   transcriptCard: {

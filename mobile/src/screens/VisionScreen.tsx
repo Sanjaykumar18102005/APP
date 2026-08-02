@@ -132,7 +132,11 @@ export const VisionScreen = () => {
       <GlassCard style={styles.uploadCard} glow>
         {imageUri ? (
           <View style={styles.previewContainer}>
-            <RNImage source={{ uri: imageUri }} style={styles.previewImage} />
+            <RNImage 
+              source={{ uri: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : imageUri }} 
+              style={styles.previewImage}
+              resizeMode="cover"
+            />
             <View style={styles.ratioBadge}>
               <Ratio color={colors.secondaryAccent} size={14} />
               <Text style={styles.ratioBadgeText}>Ratio: {aspectRatio}</Text>
