@@ -3,12 +3,12 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  Image as RNImage, 
   TouchableOpacity, 
   ScrollView, 
   ActivityIndicator, 
   Linking 
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/auth-context';
@@ -38,18 +38,26 @@ export const VisionScreen = () => {
 
   const pickImage = async (useCamera = false) => {
     try {
-      let result;
+      console.log('[VisionScreen] pickImage triggered, useCamera:', useCamera);
+      let result: ImagePicker.ImagePickerResult;
+
       if (useCamera) {
+        console.log('[VisionScreen] Requesting camera permissions...');
         const perm = await ImagePicker.requestCameraPermissionsAsync();
+        console.log('[VisionScreen] Camera permission granted:', perm.granted);
         if (!perm.granted) return;
+
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           quality: 0.7,
           base64: true,
         });
       } else {
+        console.log('[VisionScreen] Requesting media library permissions...');
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        console.log('[VisionScreen] Media library permission granted:', perm.granted);
         if (!perm.granted) return;
+
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
           quality: 0.7,
@@ -57,25 +65,42 @@ export const VisionScreen = () => {
         });
       }
 
-      if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
-        setImageBase64(result.assets[0].base64 || null);
+      console.log('[VisionScreen] ImagePicker result canceled:', result.canceled);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        console.log('[VisionScreen] Selected image URI:', asset.uri);
+        console.log('[VisionScreen] Selected image width:', asset.width, 'height:', asset.height);
+        console.log('[VisionScreen] Base64 string available:', !!asset.base64);
+        console.log('[VisionScreen] Base64 character length:', asset.base64 ? asset.base64.length : 0);
+
+        setImageUri(asset.uri);
+        setImageBase64(asset.base64 || null);
         setResultText('');
       }
     } catch (e: any) {
-      console.warn("Image pick error:", e);
+      console.error('[VisionScreen] Image pick error:', e);
     }
   };
 
   const handleAnalyzeImage = async () => {
-    if (!imageBase64 && !imageUri) return;
+    console.log('[VisionScreen] handleAnalyzeImage initiated. imageUri:', imageUri, 'hasBase64:', !!imageBase64);
+    if (!imageBase64 && !imageUri) {
+      console.warn('[VisionScreen] Aborting analyze: No imageUri or imageBase64 available');
+      return;
+    }
+
     setIsAnalyzing(true);
     setResultText('');
 
     const payloadBase64 = imageBase64 || "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    console.log('[VisionScreen] Sending payloadBase64 length:', payloadBase64.length);
 
     try {
-      const res = await fetch(getApiUrl('/api/vision'), {
+      const endpoint = getApiUrl('/api/vision');
+      console.log('[VisionScreen] POSTing image to endpoint:', endpoint);
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,7 +108,11 @@ export const VisionScreen = () => {
           aspectRatio: aspectRatio,
         })
       });
+
+      console.log('[VisionScreen] Vision API response status:', res.status);
       const data = await res.json();
+      console.log('[VisionScreen] Vision API response payload:', data);
+
       const cleaned = cleanOutput(data.text || data.masterPrompt || "Image prompt generated.");
       setResultText(cleaned);
 
@@ -92,6 +121,7 @@ export const VisionScreen = () => {
         incrementUserStat(user.uid, 'totalVisionAnalyzed').catch(console.warn);
       }
     } catch (err: any) {
+      console.error('[VisionScreen] Vision API error, using structured fallback:', err);
       const fallback = cleanOutput(
         `# 📷 Image Dissection & Universal Prompt Generation\n\n#### 🎨 Visual Composition & Style\n- **Medium:** High-fidelity UI wireframe & glassmorphic layout.\n- **Lighting:** Dark theme with neon magenta and deep purple accents.\n\n##### 1. Master Universal Prompt\n\`\`\`text\nA premium digital UI dashboard with glowing neon accents --ar ${aspectRatio}\n\`\`\``
       );
@@ -132,10 +162,14 @@ export const VisionScreen = () => {
       <GlassCard style={styles.uploadCard} glow>
         {imageUri ? (
           <View style={styles.previewContainer}>
-            <RNImage 
-              source={{ uri: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : imageUri }} 
+            <ExpoImage 
+              source={{ uri: imageUri }} 
               style={styles.previewImage}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={200}
+              onLoadStart={() => console.log('[VisionScreen] ExpoImage onLoadStart for URI:', imageUri)}
+              onLoad={() => console.log('[VisionScreen] ExpoImage loaded successfully!')}
+              onError={(err) => console.error('[VisionScreen] ExpoImage load error:', err)}
             />
             <View style={styles.ratioBadge}>
               <Ratio color={colors.secondaryAccent} size={14} />
@@ -320,7 +354,6 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   ratioBadge: {
     position: 'absolute',

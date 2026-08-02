@@ -16,7 +16,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 import { syncUserProfile } from './user-service';
 
-// Required for expo-auth-session to close the browser after OAuth
+// Required for expo-auth-session to complete authentication on mobile browsers
 WebBrowser.maybeCompleteAuthSession();
 
 export interface UserProfile {
@@ -37,38 +37,38 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
+  redirectUri: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ============================================================
-// IMPORTANT: To enable real Google Sign-In, get your Web Client ID from:
-// Firebase Console → Authentication → Sign-in method → Google → 
-//   "Web SDK configuration" → "Web client ID"
-// Then replace the value below:
-// ============================================================
 const FIREBASE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '987579083588-4g2sdq0o8upc9g9l2jcl7b6i6e5yfqcf.apps.googleusercontent.com';
+
+// Generate runtime redirect URI for Expo Go and Standalone builds
+const redirectUri = AuthSession.makeRedirectUri();
+console.log('[Google Auth Config] Calculated runtime redirectUri:', redirectUri);
+console.log('[Google Auth Config] Loaded FIREBASE_WEB_CLIENT_ID:', FIREBASE_WEB_CLIENT_ID);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // expo-auth-session Google provider — uses Expo Go proxy in development
+  // Configure Google Auth Request
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: FIREBASE_WEB_CLIENT_ID,
     webClientId: FIREBASE_WEB_CLIENT_ID,
+    redirectUri: redirectUri,
     selectAccount: true,
-    redirectUri: AuthSession.makeRedirectUri({
-      scheme: 'promptglow',
-    }),
   });
 
   // Handle Google OAuth response
   useEffect(() => {
     const handleGoogleResponse = async () => {
+      console.log('[Google Auth] Received response type:', response?.type);
       if (response?.type === 'success') {
         const authInfo = response.authentication as any;
+        console.log('[Google Auth] Auth response params/authentication:', response.params, authInfo);
         const { idToken, accessToken } = authInfo ?? {};
 
         try {
@@ -77,15 +77,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const rawAccessToken = accessToken || response.params?.access_token;
 
           if (token) {
+            console.log('[Google Auth] Creating credential with idToken length:', token.length);
             credential = GoogleAuthProvider.credential(token);
           } else if (rawAccessToken) {
+            console.log('[Google Auth] Creating credential with rawAccessToken length:', rawAccessToken.length);
             credential = GoogleAuthProvider.credential(null, rawAccessToken);
           } else {
-            setAuthError('Google Sign-In failed: No token received.');
+            console.error('[Google Auth] Error: No token or access_token in OAuth response!');
+            setAuthError('Google Sign-In failed: No ID token or Access token received from Google.');
             return;
           }
 
+          console.log('[Google Auth] Calling signInWithCredential with Firebase...');
           const cred = await signInWithCredential(auth, credential);
+          console.log('[Google Auth] Firebase authentication success! User UID:', cred.user.uid);
+
           const u: UserProfile = {
             uid: cred.user.uid,
             displayName: cred.user.displayName || 'Google User',
@@ -97,10 +103,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAuthError(null);
           await syncUserProfile(u);
         } catch (err: any) {
+          console.error('[Google Auth] Firebase signInWithCredential error:', err);
           setAuthError(formatAuthError(err));
         }
       } else if (response?.type === 'error') {
-        setAuthError('Google Sign-In failed. Please try again.');
+        console.error('[Google Auth] Response type error:', response.error);
+        setAuthError('Google Sign-In failed. Please ensure the redirect URI is added to Google Cloud Console.');
+      } else if (response?.type === 'dismiss') {
+        console.log('[Google Auth] Authentication session dismissed by user.');
       }
     };
 
@@ -215,13 +225,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     setAuthError(null);
+    console.log('[Google Auth] Prompting Google OAuth flow...');
+    console.log('[Google Auth] Prompting with request:', !!request, 'redirectUri:', redirectUri);
     try {
-      // Opens the real Google account picker in a browser sheet
+      if (!request) {
+        console.warn('[Google Auth] Google Auth request not initialized yet');
+      }
       const result = await promptAsync();
+      console.log('[Google Auth] promptAsync result:', result);
       if (result?.type === 'dismiss') {
-        // User cancelled — no error needed
+        console.log('[Google Auth] User dismissed login prompt');
       }
     } catch (err: any) {
+      console.error('[Google Auth] promptAsync error:', err);
       setAuthError('Google Sign-In could not be launched. Please try again.');
     }
   };
@@ -268,7 +284,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearAuthError = () => setAuthError(null);
 
   return (
-    <AuthContext.Provider value={{ user, loading, authError, clearAuthError, loginWithEmail, registerWithEmail, loginWithGoogle, loginAsGuest, logout }}>
+    <AuthContext.Provider value={{ user, loading, authError, clearAuthError, loginWithEmail, registerWithEmail, loginWithGoogle, loginAsGuest, logout, redirectUri }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
 import { Mic, MicOff, Sparkles, XCircle } from 'lucide-react-native';
@@ -24,18 +25,20 @@ export const VoiceScreen = ({ navigation }: any) => {
   const recordingRef = useRef<Audio.Recording | null>(null);
 
   useEffect(() => {
-    // Request microphone permissions on mount
+    // Request microphone permissions on mount & setup audio mode
     (async () => {
       try {
-        const { granted } = await Audio.requestPermissionsAsync();
-        if (granted) {
+        console.log('[VoiceScreen] Requesting microphone permissions on mount...');
+        const perm = await Audio.requestPermissionsAsync();
+        console.log('[VoiceScreen] Permission status on mount:', perm.status, 'granted:', perm.granted);
+        if (perm.granted) {
           await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
             playsInSilentModeIOS: true,
           });
         }
       } catch (e) {
-        console.warn('Audio permission error:', e);
+        console.warn('[VoiceScreen] Audio permission error on mount:', e);
       }
     })();
 
@@ -48,23 +51,28 @@ export const VoiceScreen = ({ navigation }: any) => {
 
   const startRecording = async () => {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
+      console.log('[VoiceScreen] Requesting recording permission...');
+      const perm = await Audio.requestPermissionsAsync();
+      console.log('[VoiceScreen] Permission granted:', perm.granted);
+      if (!perm.granted) {
         Alert.alert('Permission Denied', 'Microphone access is required to use Voice Composer.');
         return;
       }
 
       if (recordingRef.current) {
+        console.log('[VoiceScreen] Cleaning up existing recording reference...');
         await recordingRef.current.stopAndUnloadAsync().catch(() => {});
         recordingRef.current = null;
       }
 
+      console.log('[VoiceScreen] Setting audio mode...');
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
 
       const recording = new Audio.Recording();
+      console.log('[VoiceScreen] Preparing to record with m4a / webm options...');
       await recording.prepareToRecordAsync({
         android: {
           extension: '.m4a',
@@ -93,66 +101,95 @@ export const VoiceScreen = ({ navigation }: any) => {
 
       await recording.startAsync();
       recordingRef.current = recording;
+
+      const status = await recording.getStatusAsync();
+      console.log('[VoiceScreen] Recording started successfully. Status:', status);
+
       setIsRecording(true);
     } catch (e: any) {
-      console.warn('Start recording error:', e);
-      Alert.alert('Recording Error', e.message || 'Could not access microphone.');
+      console.error('[VoiceScreen] Start recording failed:', e);
+      Alert.alert('Recording Error', e.message || 'Could not start microphone recording.');
     }
   };
 
   const stopRecordingAndTranscribe = async () => {
-    if (!recordingRef.current) return;
+    if (!recordingRef.current) {
+      console.warn('[VoiceScreen] stopRecordingAndTranscribe called with no active recordingRef');
+      setIsRecording(false);
+      return;
+    }
 
     setIsRecording(false);
     setIsTranscribing(true);
 
     try {
+      console.log('[VoiceScreen] Stopping and unloading recording...');
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
 
+      console.log('[VoiceScreen] Recorded file URI:', uri);
+
       if (!uri) {
+        console.error('[VoiceScreen] Error: Recorded file URI is null or empty!');
+        Alert.alert('Recording Error', 'Failed to retrieve recorded audio file URI.');
         setIsTranscribing(false);
         return;
       }
 
-      // Read audio file as base64
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const reader = new FileReader();
+      // Verify file existence and non-zero size using FileSystem
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      console.log('[VoiceScreen] Recorded file info:', fileInfo);
 
-      reader.onloadend = async () => {
-        try {
-          const base64 = (reader.result as string).split(',')[1];
-          const mimeType = Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4';
-
-          const res = await fetch(getApiUrl('/api/transcribe'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioBase64: base64, mimeType }),
-          });
-
-          const data = await res.json();
-          if (data.text) {
-            setTranscript((prev) => (prev ? `${prev} ${data.text}` : data.text));
-          } else if (data.error) {
-            Alert.alert('Transcription Notice', data.error);
-          }
-        } catch (err: any) {
-          console.warn('Transcription error:', err);
-          Alert.alert('Notice', 'Voice captured. Type or refine your prompt below.');
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      reader.onerror = () => {
+      if (!fileInfo.exists) {
+        console.error('[VoiceScreen] Error: Recorded audio file does not exist at URI:', uri);
+        Alert.alert('Recording Error', 'Recorded audio file does not exist on disk.');
         setIsTranscribing(false);
-      };
+        return;
+      }
 
-      reader.readAsDataURL(blob);
+      if ('size' in fileInfo && fileInfo.size === 0) {
+        console.error('[VoiceScreen] Error: Recorded audio file size is 0 bytes!');
+        Alert.alert('Recording Error', 'Recorded audio file is empty (0 bytes).');
+        setIsTranscribing(false);
+        return;
+      }
+
+      // Read audio file directly into Base64 string via FileSystem
+      console.log('[VoiceScreen] Reading file as Base64 via FileSystem...');
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      console.log('[VoiceScreen] Audio Base64 character length:', base64.length);
+
+      const mimeType = Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4';
+      const apiUrl = getApiUrl('/api/transcribe');
+      console.log('[VoiceScreen] Sending Base64 audio payload to API endpoint:', apiUrl);
+
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: base64, mimeType }),
+      });
+
+      console.log('[VoiceScreen] Server response status:', res.status);
+      const data = await res.json();
+      console.log('[VoiceScreen] Server response payload:', data);
+
+      if (data.text) {
+        console.log('[VoiceScreen] Transcription received successfully:', data.text);
+        setTranscript((prev) => (prev ? `${prev} ${data.text}` : data.text));
+      } else if (data.error) {
+        console.warn('[VoiceScreen] Server returned error:', data.error);
+        Alert.alert('Transcription Notice', data.error);
+      } else {
+        console.warn('[VoiceScreen] No text field in server response:', data);
+      }
     } catch (e: any) {
-      console.warn('Stop recording error:', e);
+      console.error('[VoiceScreen] stopRecordingAndTranscribe exception:', e);
+      Alert.alert('Transcription Error', e.message || 'Failed to process voice recording.');
+    } finally {
       setIsTranscribing(false);
     }
   };
