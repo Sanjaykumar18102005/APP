@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   ScrollView, 
   ActivityIndicator, 
-  Linking 
+  Linking,
+  Image as RNImage
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { GlassCard } from '../components/GlassCard';
@@ -162,15 +163,22 @@ export const VisionScreen = () => {
       <GlassCard style={styles.uploadCard} glow>
         {imageUri ? (
           <View style={styles.previewContainer}>
-            <ExpoImage 
-              source={{ uri: imageUri }} 
-              style={styles.previewImage}
-              contentFit="cover"
-              transition={200}
-              onLoadStart={() => console.log('[VisionScreen] ExpoImage onLoadStart for URI:', imageUri)}
-              onLoad={() => console.log('[VisionScreen] ExpoImage loaded successfully!')}
-              onError={(err) => console.error('[VisionScreen] ExpoImage load error:', err)}
-            />
+            {(() => {
+              const displayUri = imageBase64 
+                ? (imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`)
+                : imageUri;
+              console.log('[VisionScreen] Rendering preview with displayUri length:', displayUri?.length, 'isBase64:', !!imageBase64);
+              return (
+                <RNImage
+                  source={{ uri: displayUri || imageUri || '' }}
+                  style={styles.previewImage}
+                  resizeMode="cover"
+                  onLoadStart={() => console.log('[VisionScreen] Image onLoadStart for URI length:', displayUri?.length)}
+                  onLoad={() => console.log('[VisionScreen] Image loaded successfully!')}
+                  onError={(e) => console.error('[VisionScreen] Image load error:', e.nativeEvent)}
+                />
+              );
+            })()}
             <View style={styles.ratioBadge}>
               <Ratio color={colors.secondaryAccent} size={14} />
               <Text style={styles.ratioBadgeText}>Ratio: {aspectRatio}</Text>

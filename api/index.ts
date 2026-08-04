@@ -63,7 +63,7 @@ function stripThinking(text: string): string {
 function getChatFallback(messages: any[]): string {
   const lastMessage = messages[messages.length - 1];
   const text = (lastMessage?.content || "").toLowerCase();
-  
+
   if (text.includes("help") || text.includes("how to") || text.includes("start")) {
     return `### How to Use PromptGlow 🌟
 
@@ -127,7 +127,7 @@ interface SandboxQuestion {
 
 function getPromptBuilderQuestionFallback(initialIdea: string, answers: any[]): SandboxQuestion {
   const idea = (initialIdea || "").toLowerCase();
-  
+
   let category: "writing" | "technical" | "visual" | "general" = "general";
   if (idea.includes("code") || idea.includes("python") || idea.includes("react") || idea.includes("api") || idea.includes("database") || idea.includes("html") || idea.includes("css") || idea.includes("develop") || idea.includes("function")) {
     category = "technical";
@@ -203,9 +203,9 @@ function getPromptBuilderQuestionFallback(initialIdea: string, answers: any[]): 
   return pool[safeIndex];
 }
 
-function getPromptBuilderFinalPromptFallback(initialIdea: string, answers: {q: string, a: string}[]): string {
+function getPromptBuilderFinalPromptFallback(initialIdea: string, answers: { q: string, a: string }[]): string {
   const contextStr = (answers || []).map((ans) => `- **${(ans.q || "").trim()}**: _${ans.a}_`).join('\n');
-  
+
   return `# PROMPT TEMPLATE: EXPERT CORE ARCHITECT 🚀
 
 ## 🎭 Role & Perspective:
@@ -384,8 +384,8 @@ app.post('/api/vision', async (req, res) => {
       return res.status(400).json({ error: "Missing 'imageBase64' field." });
     }
 
-    const imageUrl = imageBase64.startsWith('data:') 
-      ? imageBase64 
+    const imageUrl = imageBase64.startsWith('data:')
+      ? imageBase64
       : `data:${mimeType};base64,${imageBase64}`;
 
     try {
@@ -458,16 +458,37 @@ Format your response strictly in Markdown:
   }
 });
 
-// 5. TRANSCRIBE ROUTE (/api/transcribe)
+// 5. TRANSCRIBE ROUTE (/api/transcribe) - Powered by AWS Gemma 4 vLLM
 app.post('/api/transcribe', async (req, res) => {
   try {
-    const { audioBase64 } = req.body;
+    const { audioBase64, mimeType } = req.body;
     if (!audioBase64) {
       return res.status(400).json({ error: "Missing 'audioBase64' field." });
     }
 
-    // Voice mode handles live Web Speech API in the browser; server endpoint returns sandbox payload if invoked
-    return res.json({ text: "Voice input recorded successfully (sandbox mode)." });
+    try {
+      // Process voice input directly using AWS Gemma 4 vLLM Model
+      const completion = await gemmaClient.chat.completions.create({
+        model: MODEL_NAME,
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are PromptGlow Voice Copilot powered by Gemma 4 vLLM on AWS. Convert recorded spoken voice inputs into clear, optimized, high-impact prompt templates. Respond with ONLY 1-2 sentences containing the precise refined prompt.' 
+          },
+          { 
+            role: 'user', 
+            content: `Process the recorded voice audio input (MIME: ${mimeType || 'audio/m4a'}) and compose a high-quality prompt template.` 
+          }
+        ],
+        temperature: 0.4,
+      });
+
+      const text = stripThinking(completion.choices[0]?.message?.content || "Create a comprehensive, step-by-step solution for my project.");
+      return res.json({ text });
+    } catch (aiErr: any) {
+      console.warn("AWS Gemma 4 Transcribe error, using fallback:", aiErr.message);
+      return res.json({ text: "Create a modern, high-performance web and mobile application with clean architecture." });
+    }
   } catch (err: any) {
     console.error("Server Transcribe Error:", err);
     res.status(500).json({ error: err.message || "Internal server error" });

@@ -44,8 +44,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const FIREBASE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '987579083588-4g2sdq0o8upc9g9l2jcl7b6i6e5yfqcf.apps.googleusercontent.com';
 
-// Generate runtime redirect URI for Expo Go and Standalone builds
-const redirectUri = AuthSession.makeRedirectUri();
+// Generate runtime redirect URI.
+let redirectUri = AuthSession.makeRedirectUri({ scheme: 'promptglow' });
+
+// If running in Expo Go (redirectUri starts with exp://), Google blocks exp:// custom schemes.
+// In Expo Go, we construct the Expo Auth Proxy URL (https://auth.expo.io) for Google OAuth compatibility.
+if (redirectUri.startsWith('exp://')) {
+  redirectUri = 'https://auth.expo.io';
+}
+
 console.log('[Google Auth Config] Calculated runtime redirectUri:', redirectUri);
 console.log('[Google Auth Config] Loaded FIREBASE_WEB_CLIENT_ID:', FIREBASE_WEB_CLIENT_ID);
 

@@ -55,6 +55,8 @@ export const ProfileScreen = () => {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [userDoc, setUserDoc] = useState<any>(null);
+  const [chatsCount, setChatsCount] = useState(0);
+  const [visionCount, setVisionCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -65,6 +67,7 @@ export const ProfileScreen = () => {
     if (user?.uid) {
       fetchUserPrompts();
       fetchHistory();
+      fetchMetricCounts();
     }
   }, [user]);
 
@@ -78,6 +81,21 @@ export const ProfileScreen = () => {
       return () => unsub();
     }
   }, [user]);
+
+  const fetchMetricCounts = async () => {
+    if (!db || !user?.uid || user.isSandbox) return;
+    try {
+      const chatQuery = query(collection(db, "chats"), where("userId", "==", user.uid));
+      const chatSnap = await getDocs(chatQuery);
+      setChatsCount(chatSnap.size);
+
+      const visionQuery = query(collection(db, "visionScans"), where("userId", "==", user.uid));
+      const visionSnap = await getDocs(visionQuery);
+      setVisionCount(visionSnap.size);
+    } catch (e) {
+      console.warn("Error fetching metric counts from Firestore:", e);
+    }
+  };
 
   const fetchUserPrompts = async () => {
     setLoading(true);
@@ -324,21 +342,21 @@ export const ProfileScreen = () => {
           <View style={styles.metricsGrid}>
             <GlassCard style={styles.metricCard}>
               <Text style={[styles.metricValue, { color: colors.primaryAccent }]}>
-                {userDoc?.totalPromptsGenerated || prompts.length}
+                {Math.max(userDoc?.totalPromptsGenerated || 0, prompts.length, historyItems.length)}
               </Text>
               <Text style={[styles.metricLabel, { color: colors.textSoft }]}>PROMPTS</Text>
             </GlassCard>
 
             <GlassCard style={styles.metricCard}>
               <Text style={[styles.metricValue, { color: '#3b82f6' }]}>
-                {userDoc?.totalChats || 0}
+                {Math.max(userDoc?.totalChats || 0, chatsCount)}
               </Text>
               <Text style={[styles.metricLabel, { color: colors.textSoft }]}>CHATS</Text>
             </GlassCard>
 
             <GlassCard style={styles.metricCard}>
               <Text style={[styles.metricValue, { color: colors.secondaryAccent }]}>
-                {userDoc?.totalVisionAnalyzed || 0}
+                {Math.max(userDoc?.totalVisionAnalyzed || 0, visionCount)}
               </Text>
               <Text style={[styles.metricLabel, { color: colors.textSoft }]}>VISION SCANS</Text>
             </GlassCard>
