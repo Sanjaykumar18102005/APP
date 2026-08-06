@@ -72,8 +72,8 @@ export const ChatScreen = () => {
   return (
     <KeyboardAvoidingView 
       style={[styles.container, { backgroundColor: colors.bgNebula }]} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={80}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 25}
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
@@ -147,6 +147,7 @@ export const ChatScreen = () => {
           placeholderTextColor={colors.textMuted}
           value={input}
           onChangeText={setInput}
+          multiline
         />
         <TouchableOpacity 
           style={[styles.sendBtn, { backgroundColor: colors.primaryAccent }, !input.trim() && styles.sendBtnDisabled]} 
@@ -224,19 +225,23 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
   },
   input: {
     flex: 1,
-    height: 48,
+    minHeight: 48,
+    maxHeight: 120,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 14,
+    textAlignVertical: 'center',
   },
   sendBtn: {
     width: 48,

@@ -1,3 +1,5 @@
+import { ENV } from '../config/env';
+
 export function cleanOutput(text: string): string {
   if (!text) return "";
   let cleaned = text;
@@ -21,7 +23,7 @@ export function cleanOutput(text: string): string {
 }
 
 export function getApiUrl(path: string): string {
-  const base = process.env.EXPO_PUBLIC_API_BASE_URL || "https://promptglow-web-backend.onrender.com";
+  const base = ENV.API_BASE_URL;
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;

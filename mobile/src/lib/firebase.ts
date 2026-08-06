@@ -3,14 +3,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence, GoogleAuthProvider, getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { ENV } from '../config/env';
 
 const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyAPlp8vU1T662M3LL0GeGV1UIJ3ZZX2I-s",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0285677203.firebaseapp.com",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "gen-lang-client-0285677203",
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0285677203.firebasestorage.app",
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "987579083588",
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:987579083588:web:2b0e98695a234a53a98511"
+  apiKey: ENV.FIREBASE_API_KEY,
+  authDomain: ENV.FIREBASE_AUTH_DOMAIN,
+  projectId: ENV.FIREBASE_PROJECT_ID,
+  storageBucket: ENV.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: ENV.FIREBASE_MESSAGING_SENDER_ID,
+  appId: ENV.FIREBASE_APP_ID,
 };
 
 let app: ReturnType<typeof initializeApp>;
@@ -31,7 +32,7 @@ if (!getApps().length) {
   auth = getAuth(app);
 }
 
-const db = getFirestore(app);
+const db = getFirestore(app, ENV.FIREBASE_DATABASE_ID);
 const googleProvider = new GoogleAuthProvider();
 
 export { app, auth, db, googleProvider };

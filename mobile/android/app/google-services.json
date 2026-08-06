@@ -1,0 +1,52 @@
+{
+  "project_info": {
+    "project_number": "987579083588",
+    "project_id": "gen-lang-client-0285677203",
+    "storage_bucket": "gen-lang-client-0285677203.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:987579083588:android:2d0ede3418dc604fa98511",
+        "android_client_info": {
+          "package_name": "com.promptglow.mobile",
+          "certificate_hash": []
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "987579083588-ppaj1gb5kluhjbsq62sseamecul35dgu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.promptglow.mobile",
+            "certificate_hash": "8935a5d62f28755a57fc6c8ec9b8107b8e26ca87"
+          }
+        },
+        {
+          "client_id": "987579083588-e2uusjt4h16b9nctui14tdf4ecbjt755.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBT28c5h2hNvUQePd2yKp3ZNHz9iZ6H61U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "987579083588-ppaj1gb5kluhjbsq62sseamecul35dgu.apps.googleusercontent.com",
+              "client_type": 1
+            },
+            {
+              "client_id": "987579083588-e2uusjt4h16b9nctui14tdf4ecbjt755.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

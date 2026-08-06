@@ -14,7 +14,7 @@ export const HomeScreen = ({ navigation }: any) => {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textMain }]}>PromptGlow</Text>
+        <Text style={[styles.title, { color: colors.textMain }]}>Prompt Glow</Text>
         <Text style={[styles.subtitle, { color: colors.textSoft }]}>
           Your AI command center.{'\n'}
           Transform abstract ideas into perfect prompts.

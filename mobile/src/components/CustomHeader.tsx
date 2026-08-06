@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Sparkles } from 'lucide-react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
 export const CustomHeader: React.FC = () => {
@@ -9,8 +8,8 @@ export const CustomHeader: React.FC = () => {
   return (
     <View style={[styles.header, { backgroundColor: colors.bgNebula, borderBottomColor: colors.glassBorder }]}>
       <View style={styles.logoContainer}>
-        <Sparkles color={colors.primaryAccent} size={24} />
-        <Text style={[styles.title, { color: colors.textMain }]}>PromptGlow</Text>
+        <Image source={require('../../assets/icon.png')} style={styles.logoImg} resizeMode="contain" />
+        <Text style={[styles.title, { color: colors.textMain }]}>Prompt Glow</Text>
       </View>
       <View style={styles.badgeContainer}>
         <Text style={styles.badgeText}>AI PRO</Text>
@@ -33,6 +32,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  logoImg: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
   },
   title: {
     fontSize: 20,

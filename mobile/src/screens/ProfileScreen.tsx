@@ -8,7 +8,8 @@ import {
   ActivityIndicator, 
   Modal, 
   TextInput,
-  Image as RNImage 
+  Image as RNImage,
+  Alert
 } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
@@ -34,7 +35,7 @@ import {
   Lock,
   UserPlus
 } from 'lucide-react-native';
-import * as Clipboard from 'expo-clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 type ViewMode = 'main' | 'saved' | 'history' | 'settings' | 'subscription';
 type AuthMode = 'login' | 'register';
@@ -63,23 +64,68 @@ export const ProfileScreen = () => {
   // Modal state
   const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null);
 
+  // Clear any stale auth error when screen mounts
   useEffect(() => {
-    if (user?.uid) {
-      fetchUserPrompts();
-      fetchHistory();
-      fetchMetricCounts();
-    }
-  }, [user]);
+    clearAuthError();
+  }, []);
 
   useEffect(() => {
-    if (user?.uid && db && !user.isSandbox) {
-      const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-        if (snap.exists()) {
-          setUserDoc(snap.data());
-        }
-      }, (err) => console.warn("User doc listener warning:", err));
-      return () => unsub();
+    if (!user?.uid || !db || user.isSandbox) {
+      if (user?.isSandbox) {
+        fetchUserPrompts();
+        fetchHistory();
+      }
+      return;
     }
+
+    setLoading(true);
+
+    // 1. User profile doc listener
+    const unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        setUserDoc(snap.data());
+      }
+    }, (err) => console.warn("User doc listener warning:", err));
+
+    // 2. Saved Prompts real-time listener
+    const promptsQuery = query(collection(db, "prompts"), where("userId", "==", user.uid));
+    const unsubPrompts = onSnapshot(promptsQuery, (snap) => {
+      const fetched = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      fetched.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      setPrompts(fetched);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Prompts snapshot warning:", err);
+      setLoading(false);
+    });
+
+    // 3. Recent Prompt History real-time listener
+    const historyQuery = query(collection(db, "promptHistory"), where("userId", "==", user.uid));
+    const unsubHistory = onSnapshot(historyQuery, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      setHistoryItems(list);
+    }, (err) => console.warn("History snapshot warning:", err));
+
+    // 4. Chats count real-time listener
+    const chatQuery = query(collection(db, "chats"), where("userId", "==", user.uid));
+    const unsubChats = onSnapshot(chatQuery, (snap) => {
+      setChatsCount(snap.size);
+    }, (err) => console.warn("Chats count listener warning:", err));
+
+    // 5. Vision scans count real-time listener
+    const visionQuery = query(collection(db, "visionScans"), where("userId", "==", user.uid));
+    const unsubVision = onSnapshot(visionQuery, (snap) => {
+      setVisionCount(snap.size);
+    }, (err) => console.warn("Vision count listener warning:", err));
+
+    return () => {
+      unsubUser();
+      unsubPrompts();
+      unsubHistory();
+      unsubChats();
+      unsubVision();
+    };
   }, [user]);
 
   const fetchMetricCounts = async () => {
@@ -92,8 +138,12 @@ export const ProfileScreen = () => {
       const visionQuery = query(collection(db, "visionScans"), where("userId", "==", user.uid));
       const visionSnap = await getDocs(visionQuery);
       setVisionCount(visionSnap.size);
-    } catch (e) {
-      console.warn("Error fetching metric counts from Firestore:", e);
+    } catch (e: any) {
+      console.error("Error fetching metric counts from Firestore:", e);
+      Alert.alert(
+        'Firestore Metrics Sync Warning',
+        `Unable to fetch user counts from Firestore:\n\nError: ${e?.message || e}\nCode: ${e?.code || 'unknown'}`
+      );
     }
   };
 
@@ -116,8 +166,12 @@ export const ProfileScreen = () => {
       const snap = await getDocs(q);
       const fetched = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
       setPrompts(fetched);
-    } catch (err) {
-      console.warn("Error fetching prompts:", err);
+    } catch (err: any) {
+      console.error("Error fetching prompts:", err);
+      Alert.alert(
+        'Firestore Prompts Sync Warning',
+        `Unable to fetch saved prompts from Firestore:\n\nError: ${err?.message || err}\nCode: ${err?.code || 'unknown'}`
+      );
     } finally {
       setLoading(false);
     }
@@ -133,8 +187,16 @@ export const ProfileScreen = () => {
     }
 
     if (user?.uid) {
-      const history = await fetchUserHistoryFromFirestore(user.uid);
-      setHistoryItems(history);
+      try {
+        const history = await fetchUserHistoryFromFirestore(user.uid);
+        setHistoryItems(history);
+      } catch (err: any) {
+        console.error("Error fetching history:", err);
+        Alert.alert(
+          'Firestore History Sync Warning',
+          `Unable to fetch recent history from Firestore:\n\nError: ${err?.message || err}\nCode: ${err?.code || 'unknown'}`
+        );
+      }
     }
   };
 
@@ -154,8 +216,8 @@ export const ProfileScreen = () => {
     }
   };
 
-  const handleCopyText = async (text: string) => {
-    await Clipboard.setStringAsync(text);
+  const handleCopyText = (text: string) => {
+    Clipboard.setString(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -184,14 +246,14 @@ export const ProfileScreen = () => {
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.bgNebula }]} contentContainerStyle={styles.centerContent}>
         <GlassCard style={styles.authCard}>
-          <View style={[styles.authAvatarCircle, { backgroundColor: colors.inputBg, borderColor: colors.glassBorder }]}>
-            <User color={colors.primaryAccent} size={36} />
+          <View style={[styles.authAvatarCircle, { backgroundColor: 'transparent', borderColor: 'transparent' }]}>
+            <RNImage source={require('../../assets/icon.png')} style={{ width: 64, height: 64, borderRadius: 16 }} resizeMode="contain" />
           </View>
           <Text style={[styles.authTitle, { color: colors.textMain }]}>
-            {authMode === 'login' ? 'Sign In to PromptGlow' : 'Create Account'}
+            {authMode === 'login' ? 'Sign In to Prompt Glow' : 'Create Account'}
           </Text>
           <Text style={[styles.authSub, { color: colors.textSoft }]}>
-            {authMode === 'login' ? 'Enter your credentials to access your saved prompts & history.' : 'Join PromptGlow to sync AI prompts across web and mobile.'}
+            {authMode === 'login' ? 'Enter your credentials to access your saved prompts & history.' : 'Join Prompt Glow to sync AI prompts across web and mobile.'}
           </Text>
 
           {authError && (
@@ -275,9 +337,8 @@ export const ProfileScreen = () => {
             onPress={loginWithGoogle}
           >
             <RNImage 
-              source={{ uri: 'https://lh3.googleusercontent.com/COxitImplementedG3d5_30' }} 
+              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png' }} 
               style={styles.googleIconImg} 
-              defaultSource={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
             />
             <Text style={styles.googleAuthBtnText}>Continue with Google</Text>
           </TouchableOpacity>
@@ -531,7 +592,7 @@ export const ProfileScreen = () => {
             <View style={styles.subBadgeCircle}>
               <Sparkles color={colors.secondaryAccent} size={24} />
             </View>
-            <Text style={[styles.subPlanTitle, { color: colors.textMain }]}>PromptGlow Free</Text>
+            <Text style={[styles.subPlanTitle, { color: colors.textMain }]}>Prompt Glow Free</Text>
             <Text style={[styles.subPlanSub, { color: colors.textSoft }]}>
               You are currently on the free tier with access to standard models.
             </Text>

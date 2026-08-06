@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   ScrollView, 
   ActivityIndicator, 
-  Linking 
+  Linking,
+  Alert
 } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
@@ -22,8 +23,11 @@ import {
   Save, 
   ExternalLink 
 } from 'lucide-react-native';
-import * as Clipboard from 'expo-clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { savePromptHistoryToFirestore, incrementUserStat } from '../lib/user-service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from '../lib/firebase';
+import { addDoc, collection } from 'firebase/firestore';
 
 enum Phase {
   INIT,
@@ -44,6 +48,23 @@ export const GlowScreen = ({ route }: any) => {
   const [finalPrompt, setFinalPrompt] = useState('');
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const openUrl = async (url: string, isGemini = false) => {
+    try {
+      if (finalPrompt) {
+        Clipboard.setString(finalPrompt);
+      }
+      const targetUrl = isGemini ? 'https://gemini.google.com' : url;
+      console.log('[GlowScreen] Direct openURL:', targetUrl);
+      await Linking.openURL(targetUrl);
+    } catch (e: any) {
+      console.warn('[GlowScreen] Linking error:', e);
+      Alert.alert(
+        'Browser Launch Error',
+        `Failed to open external link: ${e?.message || e}. The prompt is already copied to your clipboard, you can paste it manually.`
+      );
+    }
+  };
 
   useEffect(() => {
     const incoming = route?.params?.initialIdea || route?.params?.initialPrompt || '';
@@ -121,14 +142,45 @@ export const GlowScreen = ({ route }: any) => {
     }
   };
 
-  const handleCopy = async () => {
-    await Clipboard.setStringAsync(finalPrompt);
+  const handleCopy = () => {
+    if (!finalPrompt) return;
+    Clipboard.setString(finalPrompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openUrl = (url: string) => {
-    Linking.openURL(url).catch(console.warn);
+  const handleSave = async () => {
+    if (!finalPrompt || saved) return;
+    try {
+      const now = new Date();
+      const promptData = {
+        title: initialIdea.substring(0, 80) || 'Generated Prompt',
+        content: finalPrompt,
+        category: 'Generated',
+        createdAtFormatted: now.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }),
+        createdAt: now.getTime(),
+      };
+      if (user?.isSandbox) {
+        const existing = await AsyncStorage.getItem('sandbox_saved_prompts');
+        const list = existing ? JSON.parse(existing) : [];
+        list.unshift({ ...promptData, id: `local_${now.getTime()}`, userId: user?.uid });
+        await AsyncStorage.setItem('sandbox_saved_prompts', JSON.stringify(list));
+        setSaved(true);
+        Alert.alert('Saved', 'Prompt saved locally on your device!');
+      } else if (db && user?.uid) {
+        await addDoc(collection(db, 'prompts'), {
+          ...promptData,
+          userId: user.uid,
+          userEmail: user.email || '',
+        });
+        setSaved(true);
+        Alert.alert('Saved', 'Prompt saved to your cloud profile!');
+      } else {
+        throw new Error('No authenticated user session found. Please sign in under the Profile tab.');
+      }
+    } catch (err: any) {
+      Alert.alert('Save failed', err.message || 'Could not save this prompt.');
+    }
   };
 
   return (
@@ -226,7 +278,10 @@ export const GlowScreen = ({ route }: any) => {
           <View style={styles.linkRow}>
             <TouchableOpacity 
               style={styles.linkChip}
-              onPress={() => openUrl(`https://chatgpt.com/?q=${encodeURIComponent(finalPrompt)}`)}
+              onPress={() => {
+                handleCopy();
+                openUrl(`https://chatgpt.com/?q=${encodeURIComponent(finalPrompt)}`);
+              }}
             >
               <ExternalLink color={colors.textSoft} size={14} />
               <Text style={[styles.linkChipText, { color: colors.textMain }]}>ChatGPT</Text>
@@ -234,7 +289,10 @@ export const GlowScreen = ({ route }: any) => {
 
             <TouchableOpacity 
               style={styles.linkChip}
-              onPress={() => openUrl(`https://claude.ai/new?q=${encodeURIComponent(finalPrompt)}`)}
+              onPress={() => {
+                handleCopy();
+                openUrl(`https://claude.ai/new?q=${encodeURIComponent(finalPrompt)}`);
+              }}
             >
               <ExternalLink color={colors.textSoft} size={14} />
               <Text style={[styles.linkChipText, { color: colors.textMain }]}>Claude</Text>
@@ -242,7 +300,10 @@ export const GlowScreen = ({ route }: any) => {
 
             <TouchableOpacity 
               style={styles.linkChip}
-              onPress={() => { handleCopy(); openUrl("https://gemini.google.com/app"); }}
+              onPress={() => { 
+                handleCopy(); 
+                openUrl('', true); 
+              }}
             >
               <ExternalLink color={colors.textSoft} size={14} />
               <Text style={[styles.linkChipText, { color: colors.textMain }]}>Gemini</Text>
@@ -252,7 +313,7 @@ export const GlowScreen = ({ route }: any) => {
           <View style={styles.actionFooter}>
             <TouchableOpacity 
               style={styles.saveBtn}
-              onPress={() => setSaved(true)}
+              onPress={handleSave}
               disabled={saved}
             >
               <Save color={saved ? "#4ade80" : colors.textMain} size={16} />

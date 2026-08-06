@@ -15,3 +15,10 @@ unified-reports/
 e2e_tests/reports/
 mobile/.expo/
 mobile/node_modules/
+.cxx/
+.expo/
+local.properties
+.gradle/
+.idea/
+*.apk
+mobile/emulator_screen.png

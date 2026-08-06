@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,212 +7,140 @@ import {
   ScrollView,
   TextInput,
   Alert,
-  Platform,
   ActivityIndicator,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system/legacy';
+import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../theme/ThemeContext';
-import { Mic, MicOff, Sparkles, XCircle } from 'lucide-react-native';
-import { getApiUrl } from '../lib/utils';
+import { Mic, MicOff, Sparkles, XCircle, RefreshCw } from 'lucide-react-native';
+import { getApiUrl, cleanOutput } from '../lib/utils';
 
 export const VoiceScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [partialSpeech, setPartialSpeech] = useState('');
 
   useEffect(() => {
-    // Request microphone permissions on mount & setup audio mode
-    (async () => {
-      try {
-        console.log('[VoiceScreen] Requesting microphone permissions on mount...');
-        const perm = await Audio.requestPermissionsAsync();
-        console.log('[VoiceScreen] Permission status on mount:', perm.status, 'granted:', perm.granted);
-        if (perm.granted) {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-          });
-        }
-      } catch (e) {
-        console.warn('[VoiceScreen] Audio permission error on mount:', e);
+    Voice.onSpeechStart = () => setIsRecording(true);
+    Voice.onSpeechEnd = () => setIsRecording(false);
+    Voice.onSpeechError = (e: SpeechErrorEvent) => {
+      console.warn('[VoiceScreen] Speech recognition error:', e.error);
+      setIsRecording(false);
+    };
+    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+      if (e.value && e.value[0]) {
+        setTranscript(e.value[0]);
+        setPartialSpeech('');
       }
-    })();
+    };
+    Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
+      if (e.value && e.value[0]) {
+        setPartialSpeech(e.value[0]);
+      }
+    };
 
     return () => {
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      }
+      Voice.destroy().then(Voice.removeAllListeners).catch(() => {});
     };
   }, []);
 
-  const startRecording = async () => {
-    try {
-      console.log('[VoiceScreen] Requesting recording permission...');
-      const perm = await Audio.requestPermissionsAsync();
-      console.log('[VoiceScreen] Permission granted:', perm.granted);
-      if (!perm.granted) {
-        Alert.alert('Permission Denied', 'Microphone access is required to use Voice Composer.');
-        return;
+  const requestAudioPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Microphone Permission',
+            message: 'PromptGlow needs microphone access for Voice Composer.',
+            buttonNeutral: 'Ask Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn('Audio permission error:', err);
+        return false;
       }
-
-      if (recordingRef.current) {
-        console.log('[VoiceScreen] Cleaning up existing recording reference...');
-        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
-        recordingRef.current = null;
-      }
-
-      console.log('[VoiceScreen] Setting audio mode...');
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const recording = new Audio.Recording();
-      console.log('[VoiceScreen] Preparing to record with m4a / webm options...');
-      await recording.prepareToRecordAsync({
-        android: {
-          extension: '.m4a',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.m4a',
-          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-          audioQuality: Audio.IOSAudioQuality.HIGH,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        },
-      });
-
-      await recording.startAsync();
-      recordingRef.current = recording;
-
-      const status = await recording.getStatusAsync();
-      console.log('[VoiceScreen] Recording started successfully. Status:', status);
-
-      setIsRecording(true);
-    } catch (e: any) {
-      console.error('[VoiceScreen] Start recording failed:', e);
-      Alert.alert('Recording Error', e.message || 'Could not start microphone recording.');
     }
+    return true;
   };
 
-  const stopRecordingAndTranscribe = async () => {
-    if (!recordingRef.current) {
-      console.warn('[VoiceScreen] stopRecordingAndTranscribe called with no active recordingRef');
-      setIsRecording(false);
+  const startRecording = async () => {
+    const hasPermission = await requestAudioPermission();
+    if (!hasPermission) {
+      Alert.alert('Permission Required', 'Microphone access is required for voice recording.');
       return;
     }
 
-    setIsRecording(false);
-    setIsTranscribing(true);
-
     try {
-      console.log('[VoiceScreen] Stopping and unloading recording...');
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-
-      console.log('[VoiceScreen] Recorded file URI:', uri);
-
-      if (!uri) {
-        console.error('[VoiceScreen] Error: Recorded file URI is null or empty!');
-        Alert.alert('Recording Error', 'Failed to retrieve recorded audio file URI.');
-        setIsTranscribing(false);
-        return;
-      }
-
-      // Verify file existence and non-zero size using FileSystem
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      console.log('[VoiceScreen] Recorded file info:', fileInfo);
-
-      if (!fileInfo.exists) {
-        console.error('[VoiceScreen] Error: Recorded audio file does not exist at URI:', uri);
-        Alert.alert('Recording Error', 'Recorded audio file does not exist on disk.');
-        setIsTranscribing(false);
-        return;
-      }
-
-      if ('size' in fileInfo && fileInfo.size === 0) {
-        console.error('[VoiceScreen] Error: Recorded audio file size is 0 bytes!');
-        Alert.alert('Recording Error', 'Recorded audio file is empty (0 bytes).');
-        setIsTranscribing(false);
-        return;
-      }
-
-      // Read audio file directly into Base64 string via FileSystem
-      console.log('[VoiceScreen] Reading file as Base64 via FileSystem...');
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      console.log('[VoiceScreen] Audio Base64 character length:', base64.length);
-
-      const mimeType = Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4';
-      const apiUrl = getApiUrl('/api/transcribe');
-      console.log('[VoiceScreen] Sending Base64 audio payload to API endpoint:', apiUrl);
-
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioBase64: base64, mimeType }),
-      });
-
-      console.log('[VoiceScreen] Server response status:', res.status);
-      const data = await res.json();
-      console.log('[VoiceScreen] Server response payload:', data);
-
-      if (data.text) {
-        console.log('[VoiceScreen] Transcription received successfully:', data.text);
-        setTranscript((prev) => (prev ? `${prev} ${data.text}` : data.text));
-      } else if (data.error) {
-        console.warn('[VoiceScreen] Server returned error:', data.error);
-        Alert.alert('Transcription Notice', data.error);
-      } else {
-        console.warn('[VoiceScreen] No text field in server response:', data);
-      }
+      setPartialSpeech('');
+      await Voice.start('en-US');
+      setIsRecording(true);
     } catch (e: any) {
-      console.error('[VoiceScreen] stopRecordingAndTranscribe exception:', e);
-      Alert.alert('Transcription Error', e.message || 'Failed to process voice recording.');
-    } finally {
-      setIsTranscribing(false);
+      console.error('[VoiceScreen] Voice.start failed:', e);
+      setIsRecording(false);
+      Alert.alert('Voice Error', e.message || 'Could not start speech recognition.');
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      await Voice.stop();
+      setIsRecording(false);
+    } catch (e: any) {
+      console.warn('[VoiceScreen] Voice.stop failed:', e);
+      setIsRecording(false);
     }
   };
 
   const toggleRecording = () => {
     if (isRecording) {
-      stopRecordingAndTranscribe();
+      stopRecording();
     } else {
       startRecording();
     }
   };
 
+  const handleAiEnhance = async () => {
+    if (!transcript.trim()) return;
+    setIsTranscribing(true);
+    try {
+      const res = await fetch(getApiUrl('/api/transcribe'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: 'dGVzdA==', mimeType: 'audio/m4a', text: transcript }),
+      });
+      const data = await res.json();
+      if (data.text) {
+        setTranscript(cleanOutput(data.text));
+      }
+    } catch (e: any) {
+      console.warn('[VoiceScreen] AI enhancement error:', e);
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
   const handleClear = () => {
     setTranscript('');
+    setPartialSpeech('');
   };
 
   const handleRefine = () => {
-    if (!transcript.trim()) return;
+    const activeText = transcript || partialSpeech;
+    if (!activeText.trim()) return;
     navigation.navigate('Glow', {
-      initialIdea: transcript.trim(),
-      initialPrompt: transcript.trim(),
+      initialIdea: activeText.trim(),
+      initialPrompt: activeText.trim(),
     });
   };
+
+  const displayText = transcript || partialSpeech;
 
   return (
     <ScrollView
@@ -223,7 +151,7 @@ export const VoiceScreen = ({ navigation }: any) => {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textMain }]}>Voice Composer</Text>
         <Text style={[styles.subtitle, { color: colors.textSoft }]}>
-          Tap mic to start recording. Tap again to stop and transcribe into a prompt.
+          Tap mic to start recording. Speak your idea aloud and watch it transcribe in real-time.
         </Text>
       </View>
 
@@ -235,9 +163,9 @@ export const VoiceScreen = ({ navigation }: any) => {
             styles.micCircle,
             {
               backgroundColor: isRecording
-                ? 'rgba(239, 68, 68, 0.15)'
+                ? 'rgba(239, 68, 68, 0.2)'
                 : isTranscribing
-                ? 'rgba(139, 92, 246, 0.15)'
+                ? 'rgba(139, 92, 246, 0.2)'
                 : colors.glassSurface,
               borderColor: isRecording
                 ? '#ef4444'
@@ -263,13 +191,13 @@ export const VoiceScreen = ({ navigation }: any) => {
             <>
               <View style={styles.redPulseDot} />
               <Text style={[styles.recordingText, { color: '#ef4444' }]}>
-                Listening to live voice input... (Tap to stop)
+                Listening live... (Tap mic again to stop)
               </Text>
             </>
           )}
           {isTranscribing && (
             <Text style={[styles.recordingText, { color: colors.secondaryAccent }]}>
-              Transcribing audio with AI...
+              Optimizing prompt with AI...
             </Text>
           )}
           {!isRecording && !isTranscribing && (
@@ -286,7 +214,7 @@ export const VoiceScreen = ({ navigation }: any) => {
           <Text style={[styles.transcriptLabel, { color: colors.textSoft }]}>
             LIVE SPEECH & USER INPUT
           </Text>
-          {transcript.length > 0 && (
+          {displayText.length > 0 && (
             <TouchableOpacity onPress={handleClear}>
               <XCircle color={colors.textSoft} size={18} />
             </TouchableOpacity>
@@ -298,27 +226,27 @@ export const VoiceScreen = ({ navigation }: any) => {
           placeholder={
             isRecording
               ? 'Listening to your voice... Speak now!'
-              : isTranscribing
-              ? 'Transcribing audio...'
               : 'Tap microphone or type your voice prompt here...'
           }
           placeholderTextColor={colors.textMuted}
-          value={transcript}
+          value={displayText}
           onChangeText={setTranscript}
           multiline
           editable={!isRecording && !isTranscribing}
         />
       </GlassCard>
 
-      {/* Refine Button */}
-      {transcript.trim() ? (
-        <TouchableOpacity
-          style={[styles.refineBtn, { backgroundColor: colors.primaryAccent }]}
-          onPress={handleRefine}
-        >
-          <Text style={styles.refineBtnText}>Refine This Prompt</Text>
-          <Sparkles color="#FFFFFF" size={18} />
-        </TouchableOpacity>
+      {/* Action Buttons */}
+      {displayText.trim() ? (
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.refineBtn, { backgroundColor: colors.primaryAccent }]}
+            onPress={handleRefine}
+          >
+            <Text style={styles.refineBtnText}>Refine This Prompt</Text>
+            <Sparkles color="#FFFFFF" size={18} />
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       <View style={{ height: 40 }} />
@@ -380,7 +308,7 @@ const styles = StyleSheet.create({
   transcriptCard: {
     width: '100%',
     padding: 18,
-    marginBottom: 24,
+    marginBottom: 20,
     minHeight: 160,
   },
   cardHeaderRow: {
@@ -400,10 +328,28 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     minHeight: 100,
   },
-  refineBtn: {
+  btnRow: {
     width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  aiEnhanceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderRadius: 14,
-    paddingVertical: 16,
+    borderWidth: 1,
+  },
+  aiEnhanceText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  refineBtn: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -411,7 +357,7 @@ const styles = StyleSheet.create({
   },
   refineBtnText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });
