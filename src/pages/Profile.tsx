@@ -15,29 +15,72 @@ export function Profile() {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [userDoc, setUserDoc] = useState<UserDocData | null>(null);
+  const [chatsCount, setChatsCount] = useState<number>(0);
+  const [visionCount, setVisionCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [selectedItem, setSelectedItem] = useState<{ id?: string; title: string; content: string; category?: string; date?: string; type: 'saved' | 'history' } | null>(null);
   const [copied, setCopied] = useState(false);
-  
-  useEffect(() => {
-    if (user?.uid) {
-      fetchPrompts(user.uid);
-    }
-  }, [user]);
 
   useEffect(() => {
-    if (user?.uid && db && !user.isSandbox) {
-      const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-        if (snap.exists()) {
-          setUserDoc(snap.data() as UserDocData);
-        }
-      }, (err) => {
-        console.warn("Realtime user doc error:", err);
-      });
-
-      return () => unsub();
+    if (!user?.uid || !db || user.isSandbox) {
+      if (user?.isSandbox) {
+        const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
+        setPrompts(sandboxPrompts);
+        const h = JSON.parse(localStorage.getItem('prompt_history') || '[]');
+        setHistoryItems(h);
+      }
+      return;
     }
+
+    setLoading(true);
+
+    // 1. User doc listener
+    const unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        setUserDoc(snap.data() as UserDocData);
+      }
+    }, (err) => console.warn("Realtime user doc error:", err));
+
+    // 2. Saved Prompts listener
+    const qPrompts = query(collection(db, 'prompts'), where('userId', '==', user.uid));
+    const unsubPrompts = onSnapshot(qPrompts, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => (b.createdAt?.seconds || b.createdAt || 0) - (a.createdAt?.seconds || a.createdAt || 0));
+      setPrompts(list);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Realtime prompts error:", err);
+      setLoading(false);
+    });
+
+    // 3. History listener
+    const qHistory = query(collection(db, 'promptHistory'), where('userId', '==', user.uid));
+    const unsubHistory = onSnapshot(qHistory, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => (b.createdAt?.seconds || b.createdAt || 0) - (a.createdAt?.seconds || a.createdAt || 0));
+      setHistoryItems(list);
+    }, (err) => console.warn("Realtime history error:", err));
+
+    // 4. Chats count listener
+    const qChats = query(collection(db, 'chats'), where('userId', '==', user.uid));
+    const unsubChats = onSnapshot(qChats, (snap) => {
+      setChatsCount(snap.size);
+    }, (err) => console.warn("Realtime chats error:", err));
+
+    // 5. Vision scans count listener
+    const qVision = query(collection(db, 'visionScans'), where('userId', '==', user.uid));
+    const unsubVision = onSnapshot(qVision, (snap) => {
+      setVisionCount(snap.size);
+    }, (err) => console.warn("Realtime vision error:", err));
+
+    return () => {
+      unsubUser();
+      unsubPrompts();
+      unsubHistory();
+      unsubChats();
+      unsubVision();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -51,39 +94,6 @@ export function Profile() {
       root.classList.add(theme);
     }
   }, [theme]);
-
-  const fetchPrompts = async (uid: string) => {
-    setLoading(true);
-    if (user?.isSandbox) {
-      const sandboxPrompts = JSON.parse(localStorage.getItem('sandbox_saved_prompts') || '[]');
-      setPrompts(sandboxPrompts);
-      setLoading(false);
-      return;
-    }
-
-    if (!isFirebaseConfigured || !db) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const q = query(collection(db, "prompts"), where("userId", "==", uid));
-      const querySnapshot = await getDocs(q);
-      const fetched = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort in memory since we might not have an index for createdAt desc
-      fetched.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setPrompts(fetched);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadHistory = () => {
-    const h = JSON.parse(localStorage.getItem('prompt_history') || '[]');
-    setHistoryItems(h);
-  };
 
   const handleLogin = async () => {
     try {
@@ -317,15 +327,15 @@ export function Profile() {
           {/* Metrics Grid */}
           <div className="grid grid-cols-3 gap-3">
             <div className="glass-panel p-4 text-center">
-              <span className="text-2xl font-bold font-mono text-primary-accent">{Math.max(userDoc?.totalPromptsGenerated || 0, prompts.length)}</span>
+              <span className="text-2xl font-bold font-mono text-primary-accent">{Math.max(userDoc?.totalPromptsGenerated || 0, prompts.length, historyItems.length)}</span>
               <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Prompts</p>
             </div>
             <div className="glass-panel p-4 text-center">
-              <span className="text-2xl font-bold font-mono text-blue-400">{userDoc?.totalChats || 0}</span>
+              <span className="text-2xl font-bold font-mono text-blue-400">{Math.max(userDoc?.totalChats || 0, chatsCount)}</span>
               <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Chats</p>
             </div>
             <div className="glass-panel p-4 text-center">
-              <span className="text-2xl font-bold font-mono text-secondary-accent">{userDoc?.totalVisionAnalyzed || 0}</span>
+              <span className="text-2xl font-bold font-mono text-secondary-accent">{Math.max(userDoc?.totalVisionAnalyzed || 0, visionCount)}</span>
               <p className="text-[11px] text-text-soft uppercase tracking-wider font-medium mt-1">Vision Scans</p>
             </div>
           </div>
@@ -341,7 +351,7 @@ export function Profile() {
                </div>
              </div>
 
-             <div onClick={() => { loadHistory(); setView('history'); }} className="glass-panel p-6 flex items-center group cursor-pointer hover:border-purple-500/50 transition-colors">
+             <div onClick={() => setView('history')} className="glass-panel p-6 flex items-center group cursor-pointer hover:border-purple-500/50 transition-colors">
                <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20 mr-4 group-hover:scale-110 transition-transform">
                  <History className="w-6 h-6 text-purple-400" />
                </div>
