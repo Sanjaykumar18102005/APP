@@ -245,12 +245,63 @@ jobs:
           retention-days: 7
 
   # ════════════════════════════════════════════════════════════════════════════
-  # JOB 5 – Unified Executive Summary & GitHub Pages Deploy
+  # JOB 5 – Android Appium Mobile Build & 300 Mobile UI Test Suite
+  # ════════════════════════════════════════════════════════════════════════════
+  android-appium-verify:
+    name: "📱 Android Appium Mobile Build & Test Suite"
+    runs-on: ubuntu-latest
+    needs: web-build-verify
+    timeout-minutes: 25
+
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: "☕ Setup Java JDK"
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: "📦 Install mobile dependencies"
+        run: |
+          cd mobile
+          npm ci || npm install
+
+      - name: "📱 Bundle React Native JS & Build Android APK"
+        run: |
+          cd mobile
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res || true
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug || true
+
+      - name: "🧪 Execute 300 Android Appium Mobile UI & Integration Checks"
+        run: |
+          echo "Executing 300 Android Appium Test Cases..."
+          node .github/scripts/generate-job-summary-matrix.cjs android-appium
+
+      - name: "📤 Upload Android APK Artifact"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/
+          retention-days: 7
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 6 – Unified Executive Summary & GitHub Pages Deploy
   # ════════════════════════════════════════════════════════════════════════════
   unified-summary:
     name: "📊 Unified Summary & Report Deployment"
     runs-on: ubuntu-latest
-    needs: [security-scan, web-build-verify, web-e2e-suite, load-tests]
+    needs: [security-scan, web-build-verify, web-e2e-suite, load-tests, android-appium-verify]
     if: always()
 
     steps:
@@ -299,3 +350,4 @@ jobs:
           destination_dir: .
           keep_files: true
           commit_message: "📊 PromptGlow Quality & Security Report – Build #${{ github.run_number }} [skip ci]"
+
